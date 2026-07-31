@@ -99,6 +99,25 @@ pub struct CopyRule {
     #[serde(default)] pub min_lot: f64,
     #[serde(default)] pub max_lot: f64,    // 0 = no cap
 
+    // Signal-side (master) lot filters — the trade is skipped entirely when
+    // the master's original volume falls outside [master_min_lot, master_max_lot].
+    // Distinct from `min_lot`/`max_lot` which clamp the *slave* volume after sizing.
+    #[serde(default)] pub master_min_lot: f64,   // 0 = off
+    #[serde(default)] pub master_max_lot: f64,   // 0 = off
+
+    // Signal-side (master) magic-number filter (MT4/MT5 only — cTrader and
+    // TradingView orders carry no magic and report 0). The trade is skipped
+    // unless its magic falls inside [master_magic_min, master_magic_max].
+    // Both 0 = filter off; min == max = exact match.
+    #[serde(default)] pub master_magic_min: i64, // 0 = off
+    #[serde(default)] pub master_magic_max: i64, // 0 = off
+
+    // Order comment shaping — appended to the slave order's comment/label.
+    // `order_comment` is a free-text template; when `order_comment_src_lot`
+    // is set, `[SRC <lots>]` (the master's original volume) is appended.
+    #[serde(default)] pub order_comment: String,
+    #[serde(default)] pub order_comment_src_lot: bool,
+
     // Symbol filters
     #[serde(default)] pub symbol_whitelist: Vec<String>,
     #[serde(default)] pub symbol_blacklist: Vec<String>,
@@ -204,6 +223,11 @@ pub struct Trade {
     /// from the master-side raw symbol. Empty for non-TV connectors.
     #[serde(default)]
     pub feed: String,
+    /// MT4/MT5 order magic number; 0 when unknown or the connector has no
+    /// magic concept (cTrader / TradingView). Used by the rule's
+    /// master-magic filter.
+    #[serde(default)]
+    pub magic: i64,
 }
 
 /// Kind of pending order — mirrors the master/slave broker's `OP_BUYLIMIT`
@@ -228,6 +252,8 @@ pub struct PendingOrder {
     #[serde(default)] pub comment: String,
     #[serde(default)] pub pip_size: f64,
     #[serde(default)] pub feed: String,
+    /// MT4/MT5 magic number of the pending order; 0 when unknown.
+    #[serde(default)] pub magic: i64,
 }
 
 /// Normalized event coming from any connector.
@@ -273,6 +299,9 @@ pub struct OrderRequest {
     pub sl: Option<f64>,
     pub tp: Option<f64>,
     pub max_slippage_pips: u32,
+    /// Custom order comment generated from the rule (empty = none).
+    #[serde(default)]
+    pub comment: String,
 }
 
 #[derive(Debug, Clone)]
@@ -287,6 +316,9 @@ pub struct PendingOrderRequest {
     pub tp: Option<f64>,
     /// UTC epoch ms; 0 = GTC.
     pub expiry: i64,
+    /// Custom order comment generated from the rule (empty = none).
+    #[serde(default)]
+    pub comment: String,
 }
 
 #[derive(Debug, Clone)]

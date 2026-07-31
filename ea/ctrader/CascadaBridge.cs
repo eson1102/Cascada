@@ -254,12 +254,12 @@ namespace cAlgo.Robots
             double tp = ParseDouble(JsonField(line, "tp"));
             double slip = ParseDouble(JsonField(line, "slippage"));
             string origin = JsonField(line, "ticket");
+            string label = BuildComment(origin, JsonField(line, "comment"));
             var symbol = TryGetSymbol(sym);
             if (symbol == null) { TryLog("error", "unknown symbol " + sym); return; }
             double units = ResolveUnits(symbol, vol);
             if (units <= 0) { TryLog("error", "volume too small for " + sym); return; }
             var tt = side == "Sell" ? TradeType.Sell : TradeType.Buy;
-            string label = "cascada:" + origin;
             double basePx = tt == TradeType.Buy ? symbol.Ask : symbol.Bid;
             double? slPips = sl > 0 ? (double?)(Math.Abs(basePx - sl) / symbol.PipSize) : null;
             double? tpPips = tp > 0 ? (double?)(Math.Abs(tp - basePx) / symbol.PipSize) : null;
@@ -286,13 +286,13 @@ namespace cAlgo.Robots
             double tp = ParseDouble(JsonField(line, "tp"));
             double expMs = ParseDouble(JsonField(line, "expiry"));
             string origin = JsonField(line, "ticket");
+            string label = BuildComment(origin, JsonField(line, "comment"));
             var symbol = TryGetSymbol(sym);
             if (symbol == null) { TryLog("error", "unknown symbol " + sym); return; }
             double units = ResolveUnits(symbol, vol);
             if (units <= 0 || target <= 0) { TryLog("error", "bad pending params for " + sym); return; }
             var tt = side == "Sell" ? TradeType.Sell : TradeType.Buy;
             DateTime? expiry = expMs > 0 ? (DateTime?)FromUnixMs((long)expMs) : null;
-            string label = "cascada:" + origin;
             double? slPx = sl > 0 ? (double?)sl : null;
             double? tpPx = tp > 0 ? (double?)tp : null;
             TradeResult r = ptype == PendingOrderType.Limit
@@ -485,7 +485,20 @@ namespace cAlgo.Robots
 
         private static string ExtractOrigin(string comment)
         {
-            return (comment != null && comment.StartsWith("cascada:")) ? comment.Substring(8) : "";
+            if (comment == null || !comment.StartsWith("cascada:")) return "";
+            string s = comment.Substring(8);
+            int sp = s.IndexOf(' ');
+            return sp >= 0 ? s.Substring(0, sp) : s;
+        }
+
+        // Origin marker + optional user comment, space-separated:
+        // "cascada:<ticket> <custom comment>". ExtractOrigin() reads only
+        // the ticket (up to the first space), so the custom comment is safe.
+        private static string BuildComment(string origin, string custom)
+        {
+            string cmt = "cascada:" + origin;
+            if (!string.IsNullOrEmpty(custom)) cmt = cmt + " " + custom;
+            return cmt;
         }
 
         private static string F(double d) { return d.ToString("0.#####", Inv); }

@@ -12,14 +12,20 @@ pub enum C2S<'a> {
     Open {
         ticket: &'a str, symbol: &'a str, side: Side,
         volume: f64, sl: f64, tp: f64, slippage: u32,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        comment: &'a str,
     },
     OpenLimit {
         ticket: &'a str, symbol: &'a str, side: Side,
         volume: f64, target: f64, sl: f64, tp: f64, expiry: i64,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        comment: &'a str,
     },
     OpenStop {
         ticket: &'a str, symbol: &'a str, side: Side,
         volume: f64, target: f64, sl: f64, tp: f64, expiry: i64,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        comment: &'a str,
     },
     Close { ticket: &'a str },
     Modify { ticket: &'a str, sl: f64, tp: f64 },
@@ -39,6 +45,7 @@ impl<'a> C2S<'a> {
                 volume: o.volume,
                 sl: o.sl.unwrap_or(0.0), tp: o.tp.unwrap_or(0.0),
                 slippage: o.max_slippage_pips,
+                comment: &o.comment,
             },
             ConnectorCmd::OpenPending(p) => {
                 let (ticket, symbol, side) = (&*p.origin_ticket, &*p.symbol, p.side);
@@ -46,14 +53,15 @@ impl<'a> C2S<'a> {
                 let sl = p.sl.unwrap_or(0.0);
                 let tp = p.tp.unwrap_or(0.0);
                 let expiry = p.expiry;
+                let comment: &str = &p.comment;
                 // Map Limit → open_limit, Stop/StopLimit → open_stop (StopLimit
                 // is MT5-only; MT4 and cTrader treat it as a plain stop, which
                 // is the closest portable behaviour).
                 match p.order_type {
                     PendingType::Limit => C2S::OpenLimit {
-                        ticket, symbol, side, volume, target, sl, tp, expiry },
+                        ticket, symbol, side, volume, target, sl, tp, expiry, comment },
                     PendingType::Stop | PendingType::StopLimit => C2S::OpenStop {
-                        ticket, symbol, side, volume, target, sl, tp, expiry },
+                        ticket, symbol, side, volume, target, sl, tp, expiry, comment },
                 }
             }
             ConnectorCmd::Close { ticket } => C2S::Close { ticket },
@@ -109,6 +117,8 @@ pub enum S2C {
         /// from the master-side raw symbol. Used by quote_offsets to
         /// match per-feed drift rules. Empty for non-TV connectors.
         #[serde(default)] feed: String,
+        /// MT4/MT5 order magic number; 0 when the connector has none.
+        #[serde(default)] magic: i64,
     },
     Close {
         ticket: String, #[serde(default)] profit: f64, ts: i64,
@@ -138,6 +148,8 @@ pub enum S2C {
         #[serde(default)] comment: String,
         #[serde(default)] pip_size: f64,
         #[serde(default)] feed: String,
+        /// MT4/MT5 magic number of the pending order; 0 when unknown.
+        #[serde(default)] magic: i64,
     },
     PendingModify {
         ticket: String,
@@ -187,14 +199,14 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
         S2C::Heartbeat { balance, equity, .. } =>
             { let _ = events.send(ConnectorEvent::Heartbeat {
                 account_id: id.clone(), balance, equity }); },
-        S2C::Open { ticket, symbol, side, volume, price, sl, tp, ts, origin, comment, pip_size, feed, .. } =>
+        S2C::Open { ticket, symbol, side, volume, price, sl, tp, ts, origin, comment, pip_size, feed, magic, .. } =>
             { let _ = events.send(ConnectorEvent::TradeOpened(Trade {
                 ticket, account_id: id.clone(),
                 symbol, side, volume, price,
                 sl: opt(sl), tp: opt(tp),
                 opened_at: ts, closed_at: None, profit: None,
                 origin_ticket: (!origin.is_empty()).then_some(origin),
-                comment, pip_size, feed,
+                comment, pip_size, feed, magic,
             })); },
         S2C::Close { ticket, profit, ts, .. } =>
             { let _ = events.send(ConnectorEvent::TradeClosed {
@@ -207,10 +219,10 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 sl: opt(sl), tp: opt(tp),
                 opened_at: 0, closed_at: None, profit: None,
                 origin_ticket: None, comment: String::new(), pip_size: 0.0,
-                feed: String::new(),
+                feed: String::new(), magic: 0,
             })); },
         S2C::Pending { ticket, symbol, side, order_type, volume, target, sl, tp,
-                       expiry, origin, comment, pip_size, feed } => {
+                       expiry, origin, comment, pip_size, feed, magic } => {
             let kind = match order_type.as_str() {
                 "Limit"     => PendingType::Limit,
                 "StopLimit" => PendingType::StopLimit,
@@ -221,7 +233,7 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 order_type: kind, volume, target,
                 sl: opt(sl), tp: opt(tp), expiry,
                 origin_ticket: (!origin.is_empty()).then_some(origin),
-                comment, pip_size, feed,
+                comment, pip_size, feed, magic,
             }));
         }
         S2C::PendingModify { ticket, target, sl, tp, expiry, .. } => {
@@ -234,7 +246,7 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 volume: 0.0, target,
                 sl: opt(sl), tp: opt(tp), expiry,
                 origin_ticket: None, comment: String::new(), pip_size: 0.0,
-                feed: String::new(),
+                feed: String::new(), magic: 0,
             }));
         }
         S2C::PendingCancel { ticket, .. } => {
@@ -256,7 +268,7 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 opened_at, closed_at: Some(closed_at), profit: Some(profit),
                 origin_ticket: (!origin.is_empty()).then_some(origin),
                 comment: String::new(), pip_size: 0.0,
-                feed: String::new(),
+                feed: String::new(), magic: 0,
             })); },
         S2C::HistoryDone { count } =>
             emit_log(events, id, LogLevel::Info, format!("history snapshot: {count} trades")),

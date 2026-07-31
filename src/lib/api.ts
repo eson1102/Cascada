@@ -43,6 +43,23 @@ export interface CopyRule {
   min_lot: number;
   max_lot: number;
 
+  /** Signal-side (master) lot filters — skip trades whose original master
+   *  volume falls outside the window (0 = bound off). Distinct from
+   *  min_lot/max_lot which clamp the *slave* volume after sizing. */
+  master_min_lot: number;
+  master_max_lot: number;
+
+  /** Signal-side (master) magic-number filter (MT4/MT5 only). Trade is
+   *  skipped unless its magic falls inside [min, max]; both 0 = off,
+   *  min === max = exact match. */
+  master_magic_min: number;
+  master_magic_max: number;
+
+  /** Custom comment written onto slave orders. `order_comment_src_lot`
+   *  appends a `[SRC <lots>]` marker with the master's original volume. */
+  order_comment: string;
+  order_comment_src_lot: boolean;
+
   symbol_whitelist: string[];
   symbol_blacklist: string[];
   symbol_prefix: string;
@@ -133,6 +150,9 @@ export function defaultRule(master_id = "", slave_id = ""): CopyRule {
     max_slippage_pips: 3,
     symbol_map: {},
     min_lot: 0, max_lot: 0,
+    master_min_lot: 0, master_max_lot: 0,
+    master_magic_min: 0, master_magic_max: 0,
+    order_comment: "", order_comment_src_lot: false,
     symbol_whitelist: [], symbol_blacklist: [],
     symbol_prefix: "", symbol_suffix: "",
     master_strip_prefix: "", master_strip_suffix: "",

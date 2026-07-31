@@ -150,6 +150,12 @@
     if (r.max_slippage_pips)   out.push({ kind: "info", text: `滑点 ≤ ${r.max_slippage_pips}p` });
     if (r.min_lot)             out.push({ kind: "info", text: `最小 ${r.min_lot} 手` });
     if (r.max_lot)             out.push({ kind: "info", text: `最大 ${r.max_lot} 手` });
+    if (r.master_min_lot)      out.push({ kind: "info", text: `信号端 ≥ ${r.master_min_lot} 手` });
+    if (r.master_max_lot)      out.push({ kind: "info", text: `信号端 ≤ ${r.master_max_lot} 手` });
+    if (r.master_magic_min || r.master_magic_max)
+      out.push({ kind: "info", text: `魔术号 ${r.master_magic_min || "0"}–${r.master_magic_max || "∞"}` });
+    if (r.order_comment?.trim()) out.push({ kind: "primary", text: `备注 ${r.order_comment.trim()}` });
+    if (r.order_comment_src_lot) out.push({ kind: "primary", text: "备注含信号端手数" });
     const offN = r.quote_offsets?.length ?? 0;
     if (offN)                  out.push({ kind: "info", text: `偏差 · ${offN}` });
     if (r.comment_filter)      out.push({ kind: "info", text: `备注 “${r.comment_filter}”` });
@@ -436,6 +442,56 @@
             </div>
           </div>
 
+          <h4 class="sub-section">信号端手数过滤</h4>
+          <p class="section-sub">按主账户<strong>原始</strong>下单手数筛选要复制的订单，不满足直接跳过（区别于上方"手数设置"里的最小/最大手数钳制）。</p>
+          <div class="form-grid">
+            <div class="field">
+              <label class="f-label" for="master-min-lot">信号端最小手数</label>
+              <div class="input-suffix">
+                <input id="master-min-lot" type="number" step="0.01" min="0" bind:value={editing.master_min_lot} />
+                <span class="suffix">lots</span>
+              </div>
+              <p class="f-help">只复制手数 ≥ 此值的订单。0 = 不设下限。</p>
+            </div>
+            <div class="field">
+              <label class="f-label" for="master-max-lot">信号端最大手数</label>
+              <div class="input-suffix">
+                <input id="master-max-lot" type="number" step="0.01" min="0" bind:value={editing.master_max_lot} />
+                <span class="suffix">lots</span>
+              </div>
+              <p class="f-help">只复制手数 ≤ 此值的订单。0 = 不设上限。</p>
+            </div>
+          </div>
+          <div class="hint-box">
+            <span class="hint-icon">ℹ</span>
+            <span>例如 0.03 与 0.5 时，仅复制 0.03 &lt; 手数 &lt; 0.5 的主账户订单。</span>
+          </div>
+
+          <h4 class="sub-section">魔术号过滤</h4>
+          <p class="section-sub">按主账户订单的 MT4/MT5 魔术号 (Magic Number) 筛选，只复制匹配的订单。cTrader / TradingView 账户无魔术号概念。</p>
+          <div class="form-grid">
+            <div class="field">
+              <label class="f-label" for="magic-min">魔术号下限</label>
+              <div class="input-suffix">
+                <input id="magic-min" type="number" min="0" step="1" bind:value={editing.master_magic_min} />
+                <span class="suffix">magic</span>
+              </div>
+              <p class="f-help">只复制魔术号 ≥ 此值的订单。0 = 不设下限。</p>
+            </div>
+            <div class="field">
+              <label class="f-label" for="magic-max">魔术号上限</label>
+              <div class="input-suffix">
+                <input id="magic-max" type="number" min="0" step="1" bind:value={editing.master_magic_max} />
+                <span class="suffix">magic</span>
+              </div>
+              <p class="f-help">只复制魔术号 ≤ 此值的订单。0 = 不设上限。</p>
+            </div>
+          </div>
+          <div class="hint-box">
+            <span class="hint-icon">ℹ</span>
+            <span>上下限相同即精确匹配。两个都为 0 = 不过滤。适用于按 EA 区分信号来源。</span>
+          </div>
+
           <label class="check-row mt">
             <input type="checkbox" bind:checked={editing.close_on_master_close} />
             <span class="check-text">
@@ -624,6 +680,27 @@
               <p class="f-help">派发到从账户前等待的时间。</p>
             </div>
           </div>
+
+          <h4 class="sub-section">订单备注</h4>
+          <p class="f-help" style="margin: 0 0 10px;">
+            写入从账户订单的自定义备注（MT4/MT5 的 Comment、cTrader 的 Label）。留空 = 不加备注。
+          </p>
+          <div class="form-grid">
+            <div class="field full">
+              <label class="f-label" for="order-comment">备注内容</label>
+              <input id="order-comment" type="text" placeholder="例如 Copy from &#123;symbol&#125; &#123;src_lot&#125;" bind:value={editing.order_comment} />
+              <p class="f-help">
+                支持占位符：<code>&#123;symbol&#125;</code>（信号端品种）、<code>&#123;side&#125;</code>（买入/卖出）、<code>&#123;src_lot&#125;</code>（信号端原始手数）。
+              </p>
+            </div>
+          </div>
+          <label class="check-row">
+            <input type="checkbox" bind:checked={editing.order_comment_src_lot} />
+            <span class="check-text">
+              <strong>备注包含信号端手数标记</strong>
+              <span class="muted">在备注末尾附加 <code>[SRC x.xx]</code>（主账户原始手数）。</span>
+            </span>
+          </label>
 
           <h4 class="sub-section">报价偏差补偿</h4>
           <p class="f-help" style="margin: 0 0 10px;">

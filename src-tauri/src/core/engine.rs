@@ -90,6 +90,7 @@ impl CopyEngine {
                 origin_ticket: t.ticket.clone(),
                 symbol, side, volume, sl, tp,
                 max_slippage_pips: rule.max_slippage_pips,
+                comment: build_order_comment(&rule, t),
             };
 
             self.state.ticket_map.mark_pending(
@@ -158,6 +159,22 @@ impl CopyEngine {
         // broker comments are ASCII in practice).
         if !rule.comment_filter.is_empty() && !contains_ci(&t.comment, &rule.comment_filter) {
             return Err("comment filter");
+        }
+        // Signal-side lot filter: skip when the master's *original* volume is
+        // outside the configured window (0 = that bound is off).
+        if rule.master_min_lot > 0.0 && t.volume < rule.master_min_lot {
+            return Err("master lot below min");
+        }
+        if rule.master_max_lot > 0.0 && t.volume > rule.master_max_lot {
+            return Err("master lot above max");
+        }
+        // Signal-side magic-number filter (MT4/MT5). Both bounds 0 = off;
+        // a single bound acts as >= / <=; min == max = exact match.
+        if rule.master_magic_min != 0 && t.magic < rule.master_magic_min {
+            return Err("master magic below min");
+        }
+        if rule.master_magic_max != 0 && t.magic > rule.master_magic_max {
+            return Err("master magic above max");
         }
         // Skip stale trades
         if rule.skip_older_than_secs > 0 {
@@ -284,6 +301,7 @@ impl CopyEngine {
                 origin_ticket: p.ticket.clone(),
                 symbol, side, order_type: p.order_type,
                 volume, target, sl, tp, expiry: p.expiry,
+                comment: build_order_comment(&rule, &as_trade),
             };
 
             self.state.ticket_map.mark_pending(
@@ -365,6 +383,7 @@ fn pending_as_trade(p: &PendingOrder) -> Trade {
         comment: p.comment.clone(),
         pip_size: p.pip_size,
         feed: p.feed.clone(),
+        magic: p.magic,
     }
 }
 
@@ -590,4 +609,48 @@ fn clamp_volume(rule: &CopyRule, v: f64) -> f64 {
     if rule.min_lot > 0.0 && v < rule.min_lot { v = rule.min_lot; }
     if rule.max_lot > 0.0 && v > rule.max_lot { v = rule.max_lot; }
     v
+}
+
+/// Build the custom comment attached to the slave order, from the rule's
+/// free-text template plus an optional `[SRC <lots>]` marker carrying the
+/// master's *original* volume. Returns an empty string when the user enabled
+/// neither, so old EAs / plain copies keep working unchanged.
+///
+/// Template placeholders (case-insensitive):
+///   {symbol}  — master-side ticker as seen by the rule (before slave mapping)
+///   {side}    — Buy / Sell
+///   {src_lot} — master's original volume
+fn build_order_comment(rule: &CopyRule, t: &Trade) -> String {
+    let mut out = String::new();
+    let template = rule.order_comment.trim();
+    if !template.is_empty() {
+        out.push_str(&expand_template(template, t));
+    }
+    if rule.order_comment_src_lot {
+        if !out.is_empty() { out.push(' '); }
+        out.push_str(&format!("[SRC {}]", format_lot(t.volume)));
+    }
+    out
+}
+
+fn expand_template(template: &str, t: &Trade) -> String {
+    let src_lot = format_lot(t.volume);
+    let side = if matches!(t.side, Side::Buy) { "Buy" } else { "Sell" };
+    // Case-insensitive placeholder scan — replace {key} and {KEY}.
+    let mut s = template.to_string();
+    for (lo, hi, val) in [
+        ("{symbol}", "{SYMBOL}", t.symbol.as_str()),
+        ("{side}", "{SIDE}", side),
+        ("{src_lot}", "{SRC_LOT}", src_lot.as_str()),
+    ] {
+        s = s.replace(lo, val).replace(hi, val);
+    }
+    s
+}
+
+/// Master lot formatted like the rest of the app (4-decimal, no trailing
+/// zeros for integers — matches compute_volume's rounding).
+fn format_lot(v: f64) -> String {
+    let r = (v * 10_000.0).round() / 10_000.0;
+    if r.fract() == 0.0 { format!("{r:.0}") } else { format!("{r:.4}").trim_end_matches('0').trim_end_matches('.').to_string() }
 }

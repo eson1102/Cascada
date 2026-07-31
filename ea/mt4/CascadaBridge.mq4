@@ -481,6 +481,7 @@ void DoOpenMarket(const string line)
    double tp   = NormalizePrice(sym, StringToDouble(JsonField(line, "tp")));
    int    slip = (int)StringToInteger(JsonField(line, "slippage"));
    string origin = JsonField(line, "ticket");
+   string cmt = BuildComment(origin, JsonField(line, "comment"));
    if(vol <= 0) { WriteLog("error", "bad volume for " + sym); return; }
    if(!EnsureSymbolReady(sym)) return;
 
@@ -488,7 +489,7 @@ void DoOpenMarket(const string line)
    double price = (t == OP_BUY) ? MarketInfo(sym, MODE_ASK) : MarketInfo(sym, MODE_BID);
    double point = MarketInfo(sym, MODE_POINT);
    int    pts   = (slip > 0 && point > 0) ? (int)MathRound(slip * PipSize(sym) / point) : 10;
-   int r = OrderSend(sym, t, vol, price, pts, sl, tp, "cascada:" + origin, 0, 0, clrNONE);
+   int r = OrderSend(sym, t, vol, price, pts, sl, tp, cmt, 0, 0, clrNONE);
    if(r < 0) WriteLog("error", "open failed " + sym + ": " + IntegerToString(GetLastError()));
 }
 
@@ -502,6 +503,7 @@ void DoOpenPending(const string line, bool is_limit)
    double tp   = NormalizePrice(sym, StringToDouble(JsonField(line, "tp")));
    long expiry_ms = StringToInteger(JsonField(line, "expiry"));
    string origin = JsonField(line, "ticket");
+   string cmt = BuildComment(origin, JsonField(line, "comment"));
    if(vol <= 0 || tgt <= 0) { WriteLog("error", "bad pending params for " + sym); return; }
    if(!EnsureSymbolReady(sym)) return;
 
@@ -509,7 +511,7 @@ void DoOpenPending(const string line, bool is_limit)
    if(side == "Sell") t = is_limit ? OP_SELLLIMIT : OP_SELLSTOP;
    else               t = is_limit ? OP_BUYLIMIT  : OP_BUYSTOP;
    datetime exp = (expiry_ms > 0) ? (datetime)(expiry_ms / 1000) : (datetime)0;
-   int r = OrderSend(sym, t, vol, tgt, 5, sl, tp, "cascada:" + origin, 0, exp, clrNONE);
+   int r = OrderSend(sym, t, vol, tgt, 5, sl, tp, cmt, 0, exp, clrNONE);
    if(r < 0) WriteLog("error", "pending failed " + sym + ": " + IntegerToString(GetLastError()));
 }
 
@@ -699,8 +701,23 @@ bool EnsureSymbolReady(const string sym)
 string ExtractOrigin(const string comment)
 {
    if(StringLen(comment) >= 8 && StringFind(comment, "cascada:") == 0)
-      return StringSubstr(comment, 8);
+   {
+      string s = StringSubstr(comment, 8);
+      int sp = StringFind(s, " ");
+      if(sp >= 0) s = StringSubstr(s, 0, sp);
+      return s;
+   }
    return "";
+}
+
+// Origin marker + optional user comment, space-separated:
+// "cascada:<ticket> <custom comment>". ExtractOrigin() reads only the
+// ticket (up to the first space), so the custom comment is safe.
+string BuildComment(const string origin, const string custom)
+{
+   string cmt = "cascada:" + origin;
+   if(StringLen(custom) > 0) cmt = cmt + " " + custom;
+   return cmt;
 }
 
 string F2(double d) { return DoubleToString(d, 2); }
