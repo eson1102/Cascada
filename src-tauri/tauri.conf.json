@@ -46,5 +46,16 @@
       "resources/python": "python"
     }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/flocom/Cascada/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcxODZCMjgzNEM5OUNCNUIKUldSYnk1bE1nN0tHY1RPOXdON2xMSnZVM0t0SUNCTUtHYU1OZlBTT3J2d0gyN0FyNU45VW1ILzYK",
+      "active": false,
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
 }
