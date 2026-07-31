@@ -9,17 +9,17 @@
 
 <div class="card">
   <div class="card-header">
-    <h2>Trades</h2>
-    <span class="chip">{trades.length} recent</span>
+    <h2>交易</h2>
+    <span class="chip">最近 {trades.length} 条</span>
   </div>
   {#if trades.length === 0}
-    <div class="empty">No trades yet.</div>
+    <div class="empty">暂无交易。</div>
   {:else}
     <div class="tbl">
       <div class="row head">
-        <span>Time</span><span>Account</span><span>Ticket</span><span>Symbol</span><span>Side</span>
-        <span class="right">Volume</span><span class="right">Price</span><span class="right">SL</span>
-        <span class="right">TP</span><span class="right">P/L</span>
+        <span>时间</span><span>账户</span><span>单号</span><span>品种</span><span>方向</span>
+        <span class="right">手数</span><span class="right">价格</span><span class="right">止损</span>
+        <span class="right">止盈</span><span class="right">盈亏</span>
       </div>
       <div class="vl-wrap">
         <VirtualList items={trades} rowHeight={32}>
@@ -29,13 +29,13 @@
               <span class="strong">{labelOf(idx, t.account_id)}</span>
               <span class="num muted">{t.ticket}</span>
               <span>{t.symbol}</span>
-              <span><span class="chip" class:success={t.side === "Buy"} class:danger={t.side === "Sell"}>{t.side}</span></span>
+              <span><span class="chip" class:success={t.side === "Buy"} class:danger={t.side === "Sell"}>{t.side === "Buy" ? "买入" : t.side === "Sell" ? "卖出" : t.side}</span></span>
               <span class="right num">{t.volume}</span>
               <span class="right num">{t.price}</span>
               <span class="right num muted">{t.sl ?? "—"}</span>
               <span class="right num muted">{t.tp ?? "—"}</span>
               <span class="right num" class:pos={(t.profit ?? 0) > 0} class:neg={(t.profit ?? 0) < 0}>
-                {t.profit != null ? t.profit.toFixed(2) : "open"}
+                {t.profit != null ? t.profit.toFixed(2) : "未平仓"}
               </span>
             </div>
           </svelte:fragment>

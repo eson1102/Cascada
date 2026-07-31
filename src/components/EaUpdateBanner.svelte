@@ -33,13 +33,13 @@
   <div class="ea-update-banner" role="status">
     <span class="ea-dot"></span>
     <div class="ea-msg">
-      <strong>{outdatedEas.length} EA{outdatedEas.length > 1 ? "s" : ""} out of date.</strong>
+      <strong>{outdatedEas.length} 个 EA 版本过旧。</strong>
       <span class="muted small">
-        {outdatedPlatforms.join(" · ")} — Cascada ships a newer build. Installed files will be overwritten.
+        {outdatedPlatforms.join(" · ")} — Cascada 附带更新版本。已安装的文件将被覆盖。
       </span>
     </div>
     <button class="primary sm" on:click={updateAllOutdated} disabled={eaUpdateBusy}>
-      {eaUpdateBusy ? "Updating…" : "Update now"}
+      {eaUpdateBusy ? "正在更新…" : "立即更新"}
     </button>
   </div>
 {/if}

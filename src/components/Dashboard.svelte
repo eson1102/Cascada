@@ -26,40 +26,40 @@
 
 <div class="grid">
   <div class="kpi card">
-    <div class="kpi-label">Total equity</div>
+    <div class="kpi-label">总净值</div>
     <div class="kpi-value num">{totalEquity.toFixed(2)}</div>
-    <div class="kpi-sub">Balance {totalBalance.toFixed(2)}</div>
+    <div class="kpi-sub">余额 {totalBalance.toFixed(2)}</div>
   </div>
   <div class="kpi card">
-    <div class="kpi-label">Accounts</div>
+    <div class="kpi-label">账户</div>
     <div class="kpi-value num">{connected}<span class="kpi-unit"> / {accounts.length}</span></div>
-    <div class="kpi-sub">connected</div>
+    <div class="kpi-sub">已连接</div>
   </div>
   <div class="kpi card">
-    <div class="kpi-label">Active rules</div>
+    <div class="kpi-label">运行中的规则</div>
     <div class="kpi-value num">{activeRules}</div>
-    <div class="kpi-sub">{rules.length} total</div>
+    <div class="kpi-sub">{rules.length} 条规则</div>
   </div>
   <div class="kpi card">
-    <div class="kpi-label">Open positions</div>
+    <div class="kpi-label">持仓</div>
     <div class="kpi-value num">{openPositions}</div>
-    <div class="kpi-sub">{trades.length} trades logged</div>
+    <div class="kpi-sub">已记录 {trades.length} 笔交易</div>
   </div>
 </div>
 
 <div class="card" style="margin-top: 24px;">
   <div class="card-header">
-    <h2>Recent activity</h2>
-    <span class="chip">live</span>
+    <h2>近期动态</h2>
+    <span class="chip">实时</span>
   </div>
   {#if recentTrades.length === 0}
     <div class="empty">
-      <p>No trades yet. Connect a master account and the activity will stream here.</p>
+      <p>暂无交易。连接主账户后，交易动态将在此实时显示。</p>
     </div>
   {:else}
     <table>
       <thead>
-        <tr><th>Time</th><th>Account</th><th>Symbol</th><th>Side</th><th>Volume</th><th>Price</th><th>P/L</th></tr>
+        <tr><th>时间</th><th>账户</th><th>品种</th><th>方向</th><th>手数</th><th>价格</th><th>盈亏</th></tr>
       </thead>
       <tbody>
         {#each recentTrades as t (t.ticket + t.account_id)}

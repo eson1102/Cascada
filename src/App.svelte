@@ -107,16 +107,16 @@
     try {
       const stamp = new Date().toISOString().slice(0, 10);
       const path = await save({
-        title: "Export Cascada settings",
+        title: "导出 Cascada 设置",
         defaultPath: `cascada-settings-${stamp}.json`,
-        filters: [{ name: "Cascada settings", extensions: ["json"] }],
+        filters: [{ name: "Cascada 设置", extensions: ["json"] }],
       });
       if (!path) return;
       await api.exportSettings(path);
-      await message(`Exported ${accounts.length} account(s) and ${rules.length} rule(s).`,
-        { title: "Settings exported", kind: "info" });
+      await message(`已导出 ${accounts.length} 个账户和 ${rules.length} 条规则。`,
+        { title: "设置已导出", kind: "info" });
     } catch (e) {
-      await message(String(e), { title: "Export failed", kind: "error" });
+      await message(String(e), { title: "导出失败", kind: "error" });
     } finally {
       busy = "";
     }
@@ -125,24 +125,24 @@
   async function importSettings() {
     if (busy) return;
     const ok = await ask(
-      "Importing will replace ALL current accounts, rules and live connections. " +
-      "Account passwords are not part of exports — you'll need to reconnect manually.",
-      { title: "Import settings?", kind: "warning", okLabel: "Choose file…", cancelLabel: "Cancel" });
+      "导入将替换当前所有账户、规则和实时连接。 " +
+      "账户密码不包含在导出文件中——您需要手动重新连接。",
+      { title: "导入设置？", kind: "warning", okLabel: "选择文件…", cancelLabel: "取消" });
     if (!ok) return;
     busy = "import";
     try {
       const path = await open({
-        title: "Import Cascada settings",
+        title: "导入 Cascada 设置",
         multiple: false,
-        filters: [{ name: "Cascada settings", extensions: ["json"] }],
+        filters: [{ name: "Cascada 设置", extensions: ["json"] }],
       });
       if (!path || typeof path !== "string") return;
       const report = await api.importSettings(path);
       await refresh();
-      await message(`Imported ${report.accounts} account(s) and ${report.rules} rule(s).`,
-        { title: "Settings imported", kind: "info" });
+      await message(`已导入 ${report.accounts} 个账户和 ${report.rules} 条规则。`,
+        { title: "设置已导入", kind: "info" });
     } catch (e) {
-      await message(String(e), { title: "Import failed", kind: "error" });
+      await message(String(e), { title: "导入失败", kind: "error" });
     } finally {
       busy = "";
     }
@@ -164,12 +164,12 @@
   }).length;
 
   const nav: { id: Tab; label: string; icon: string }[] = [
-    { id: "dashboard", label: "Dashboard", icon: "M3 12l2-2 4 4 8-8 4 4" },
-    { id: "accounts", label: "Accounts", icon: "M4 7h16M4 12h16M4 17h10" },
-    { id: "rules", label: "Copy rules", icon: "M7 7h10M7 12h10M7 17h6" },
-    { id: "trades", label: "Trades", icon: "M4 19V5M4 19h16M8 15V9M12 15V7M16 15v-4" },
-    { id: "compare", label: "Compare", icon: "M3 6h12M3 12h18M3 18h9" },
-    { id: "logs", label: "Logs", icon: "M5 5h14v14H5zM8 9h8M8 13h8M8 17h5" },
+    { id: "dashboard", label: "仪表盘", icon: "M3 12l2-2 4 4 8-8 4 4" },
+    { id: "accounts", label: "账户", icon: "M4 7h16M4 12h16M4 17h10" },
+    { id: "rules", label: "复制规则", icon: "M7 7h10M7 12h10M7 17h6" },
+    { id: "trades", label: "交易", icon: "M4 19V5M4 19h16M8 15V9M12 15V7M16 15v-4" },
+    { id: "compare", label: "对比", icon: "M3 6h12M3 12h18M3 18h9" },
+    { id: "logs", label: "日志", icon: "M5 5h14v14H5zM8 9h8M8 13h8M8 17h5" },
   ];
 </script>
 
@@ -200,7 +200,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d={n.icon}/></svg>
           <span>{n.label}</span>
           {#if n.id === "rules" && rulesNeedingAttention > 0}
-            <span class="nav-badge" title={`${rulesNeedingAttention} rule(s) need your attention`}>
+            <span class="nav-badge" title={`${rulesNeedingAttention} 条规则需要您关注`}>
               {rulesNeedingAttention}
             </span>
           {/if}
@@ -210,27 +210,27 @@
     <div class="sidebar-footer">
       <UpdateBanner />
       <button class="check-update"
-              title="Check GitHub for a newer Cascada version"
+              title="在 GitHub 上检查 Cascada 是否有新版本"
               disabled={$updateState.kind === 'checking' || $updateState.kind === 'downloading'}
               on:click={() => checkForUpdate(true)}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-        Check for updates
+        检查更新
       </button>
       <div class="settings-row">
-        <button class="settings-btn" title="Export accounts & rules to a JSON file"
+        <button class="settings-btn" title="将账户与规则导出为 JSON 文件"
                 disabled={busy !== ""} on:click={exportSettings}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
-          {busy === "export" ? "…" : "Export"}
+          {busy === "export" ? "…" : "导出"}
         </button>
-        <button class="settings-btn" title="Replace settings from a JSON file"
+        <button class="settings-btn" title="从 JSON 文件导入设置"
                 disabled={busy !== ""} on:click={importSettings}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14"/></svg>
-          {busy === "import" ? "…" : "Import"}
+          {busy === "import" ? "…" : "导入"}
         </button>
       </div>
       <div class="status-line">
         <span class="dot" class:on={accounts.some(a => a.connected)}></span>
-        <span class="muted">{accounts.filter(a => a.connected).length}/{accounts.length} connected</span>
+        <span class="muted">{accounts.filter(a => a.connected).length}/{accounts.length} 已连接</span>
       </div>
     </div>
   </aside>

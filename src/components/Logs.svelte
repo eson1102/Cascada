@@ -8,12 +8,12 @@
 
 <div class="card">
   <div class="card-header">
-    <h2>Logs</h2>
+    <h2>日志</h2>
     <span class="chip">{logs.length}</span>
   </div>
   <div class="log-body">
     {#if logs.length === 0}
-      <div class="empty">No events yet.</div>
+      <div class="empty">暂无事件。</div>
     {:else}
       <VirtualList items={logs} rowHeight={ROW_H} let:item>
         <div class="line">

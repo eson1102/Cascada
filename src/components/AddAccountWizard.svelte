@@ -7,10 +7,10 @@
   let installStatus: { kind: "info" | "ok" | "err"; text: string } | null = null;
 
   const platforms: { id: Platform; name: string; tag: string }[] = [
-    { id: "cTrader", name: "cTrader", tag: "cBot · auto-discovered" },
-    { id: "MT4",     name: "MetaTrader 4", tag: "EA · auto-discovered" },
-    { id: "MT5",     name: "MetaTrader 5", tag: "EA · auto-discovered" },
-    { id: "TradingView", name: "TradingView", tag: "Sidecar · auto-discovered" },
+    { id: "cTrader", name: "cTrader", tag: "cBot · 自动发现" },
+    { id: "MT4",     name: "MetaTrader 4", tag: "EA · 自动发现" },
+    { id: "MT5",     name: "MetaTrader 5", tag: "EA · 自动发现" },
+    { id: "TradingView", name: "TradingView", tag: "Sidecar · 自动发现" },
   ];
 
   // Hide the shared install banner when TvProxyPanel surfaces its own
@@ -20,32 +20,32 @@
     && /python.*not found on path/i.test(installStatus.text);
 
   async function installCtraderBot() {
-    installStatus = { kind: "info", text: "Scanning cTrader installs…" };
+    installStatus = { kind: "info", text: "正在扫描 cTrader 安装…" };
     try {
       const paths = await api.installCtraderBot();
-      installStatus = { kind: "ok", text: `Installed into ${paths.length} install${paths.length > 1 ? "s" : ""}. Confirm the cTrader import dialog, attach the cBot to a chart and press Start — your account will appear here automatically.` };
+      installStatus = { kind: "ok", text: `已安装到 ${paths.length} 个安装位置。确认 cTrader 的导入对话框，将 cBot 附加到图表并按下 Start——您的账户将自动出现在这里。` };
     } catch (e) {
-      installStatus = { kind: "err", text: `${e} — try "Pick location" instead.` };
+      installStatus = { kind: "err", text: `${e} — 请改用"选择位置…"。` };
     }
   }
   async function installCtraderBotManual() {
-    const picked = await openDialog({ directory: true, title: "Select your cAlgo folder" });
+    const picked = await openDialog({ directory: true, title: "选择您的 cAlgo 文件夹" });
     if (!picked || Array.isArray(picked)) return;
-    installStatus = { kind: "info", text: "Installing…" };
+    installStatus = { kind: "info", text: "正在安装…" };
     try {
       const p = await api.installCtraderBotAt(picked);
-      installStatus = { kind: "ok", text: `Installed → ${p}. Attach the cBot to a chart and press Start.` };
+      installStatus = { kind: "ok", text: `已安装 → ${p}。将 cBot 附加到图表并按下 Start。` };
     } catch (e) {
-      installStatus = { kind: "err", text: `Failed: ${e}` };
+      installStatus = { kind: "err", text: `安装失败：${e}` };
     }
   }
   async function installMtEaAuto() {
     if (mode !== "MT4" && mode !== "MT5") return;
     const target: "MT4" | "MT5" = mode;
-    installStatus = { kind: "info", text: `Scanning ${target} terminals…` };
+    installStatus = { kind: "info", text: `正在扫描 ${target} 终端…` };
     try {
       const paths = await api.installMtEa(target);
-      installStatus = { kind: "ok", text: `EA installed into ${paths.length} terminal${paths.length > 1 ? "s" : ""}. Refresh the Navigator panel in ${target}, then drag CascadaBridge onto a chart.` };
+      installStatus = { kind: "ok", text: `EA 已安装到 ${paths.length} 个终端。刷新 ${target} 中的导航器面板，然后将 CascadaBridge 拖到图表上。` };
     } catch (e) {
       installStatus = { kind: "err", text: `${e}` };
     }
@@ -55,15 +55,15 @@
     const target: "MT4" | "MT5" = mode;
     const picked = await openDialog({
       directory: true,
-      title: `Select the ${target} data folder (contains MQL${target === "MT4" ? "4" : "5"}/)`,
+      title: `选择 ${target} 数据文件夹（包含 MQL${target === "MT4" ? "4" : "5"}/）`,
     });
     if (!picked || Array.isArray(picked)) return;
-    installStatus = { kind: "info", text: "Installing EA…" };
+    installStatus = { kind: "info", text: "正在安装 EA…" };
     try {
       const p = await api.installMtEaAt(target, picked);
-      installStatus = { kind: "ok", text: `EA copied → ${p}. Refresh the Navigator panel in ${target}.` };
+      installStatus = { kind: "ok", text: `EA 已复制 → ${p}。刷新 ${target} 中的导航器面板。` };
     } catch (e) {
-      installStatus = { kind: "err", text: `Failed: ${e}` };
+      installStatus = { kind: "err", text: `安装失败：${e}` };
     }
   }
 
@@ -89,20 +89,20 @@
 
   <div class="instructions">
     {#if mode === "cTrader"}
-      <p class="lead">Install the <code>CascadaBridge</code> cBot, attach it to any chart, press <strong>Start</strong>. Your account appears here automatically — no login or label needed.</p>
+      <p class="lead">安装 <code>CascadaBridge</code> cBot，将其附加到任意图表并按下 <strong>Start</strong>。您的账户会自动出现在这里——无需登录或标签。</p>
       <div class="install-row">
-        <button class="primary" on:click={installCtraderBot}>Auto-install cBot</button>
-        <button on:click={installCtraderBotManual}>Pick location…</button>
+        <button class="primary" on:click={installCtraderBot}>自动安装 cBot</button>
+        <button on:click={installCtraderBotManual}>选择位置…</button>
       </div>
     {:else if mode === "TradingView"}
       <TvProxyPanel bind:installStatus active={mode === "TradingView"} />
     {:else}
       <p class="lead">
-        Install <code>CascadaBridge.{mode === "MT4" ? "mq4" : "mq5"}</code>, enable <strong>AutoTrading</strong>, and drag the EA onto any chart — your account appears here automatically. No network setup needed. Multiple {mode} terminals are supported in parallel.
+        安装 <code>CascadaBridge.{mode === "MT4" ? "mq4" : "mq5"}</code>，开启 <strong>AutoTrading</strong>，并将 EA 拖到任意图表上——您的账户会自动出现在这里。无需网络配置，支持同时运行多个 {mode} 终端。
       </p>
       <div class="install-row">
-        <button class="primary" on:click={installMtEaAuto}>Auto-install Expert Advisor</button>
-        <button on:click={installMtEaManual}>Pick location…</button>
+        <button class="primary" on:click={installMtEaAuto}>自动安装 Expert Advisor</button>
+        <button on:click={installMtEaManual}>选择位置…</button>
       </div>
     {/if}
     {#if installStatus && !pythonMissing}

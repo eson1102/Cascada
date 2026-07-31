@@ -65,9 +65,9 @@
       const slaveLbl = acc.label || acc.login;
       const masterLbl = master.label || master.login;
       const ok = await ask(
-        `Move "${slaveLbl}" under "${masterLbl}"?\n\n` +
-        `${stale.length} existing rule(s) linking this slave to its previous master will be deleted.`,
-        { title: "Reassign slave?", kind: "warning", okLabel: "Move & delete", cancelLabel: "Cancel" });
+        `将 "${slaveLbl}" 移到 "${masterLbl}" 名下？\n\n` +
+        `${stale.length} 条连接该从账户与其原主账户的现有规则将被删除。`,
+        { title: "重新分配从账户？", kind: "warning", okLabel: "移动并删除", cancelLabel: "取消" });
       if (!ok) return;
       for (const r of stale) await api.deleteRule(r.id);
     }
@@ -123,14 +123,14 @@
   async function unlinkSlave(rule: CopyRule) {
     const master = accountMap.get(rule.master_id);
     const slave = accountMap.get(rule.slave_id);
-    const masterLbl = master ? (master.label || master.login) : "master";
-    const slaveLbl  = slave  ? (slave.label  || slave.login)  : "slave";
+    const masterLbl = master ? (master.label || master.login) : "主账户";
+    const slaveLbl  = slave  ? (slave.label  || slave.login)  : "从账户";
     const willIdle = slave && !rules.some((r) => r.slave_id === slave.id && r.id !== rule.id);
     const ok = await ask(
-      `Unlink "${slaveLbl}" from "${masterLbl}"?\n\n` +
-      `The copy rule will be deleted.` +
-      (willIdle ? ` "${slaveLbl}" will be moved back to Idle.` : ""),
-      { title: "Unlink slave?", kind: "warning", okLabel: "Unlink", cancelLabel: "Cancel" });
+      `从 "${masterLbl}" 断开 "${slaveLbl}"？\n\n` +
+      `复制规则将被删除。` +
+      (willIdle ? ` "${slaveLbl}" 将移回未分配。` : ""),
+      { title: "断开从账户？", kind: "warning", okLabel: "断开", cancelLabel: "取消" });
     if (!ok) return;
     await api.deleteRule(rule.id);
     if (willIdle && slave) await api.setRole(slave.id, "Idle");
@@ -198,9 +198,9 @@
 
 <div class="card">
   <div class="card-header">
-    <h2>Accounts</h2>
+    <h2>账户</h2>
     <button class="primary" on:click={() => { showAdd = !showAdd; }}>
-      {showAdd ? "Close" : "+ Connect platform"}
+      {showAdd ? "关闭" : "+ 连接平台"}
     </button>
   </div>
 
@@ -212,8 +212,8 @@
 
   {#if accounts.length === 0}
     <div class="empty">
-      <div class="empty-title">Waiting for platforms…</div>
-      <div class="empty-body">Install the cBot or EA — accounts appear automatically once connected.</div>
+      <div class="empty-title">等待平台…</div>
+      <div class="empty-body">安装 cBot 或 EA——账户连接后会自动出现。</div>
     </div>
   {:else}
     <div class="tree">
@@ -229,7 +229,7 @@
              on:drop={(e) => onDrop(e, m)}
              role="region">
           <div class="row master">
-            <span class="role-badge master-badge">MASTER</span>
+            <span class="role-badge master-badge">主账户</span>
             <span class="chip platform {m.platform}">{m.platform}</span>
             <div class="label-col">
               {#if editingId === m.id}
@@ -239,13 +239,13 @@
                   on:keydown={(e) => { if (e.key === "Enter") (e.currentTarget).blur(); if (e.key === "Escape") editingId = null; }}
                   autofocus />
               {:else}
-                <button class="label-btn" on:click={() => startEdit(m)} title="Rename">{m.label}</button>
+                <button class="label-btn" on:click={() => startEdit(m)} title="重命名">{m.label}</button>
               {/if}
               <span class="muted small">{m.login || "—"}</span>
             </div>
             <span class="status-pill" class:online={m.connected}>
               <span class="status-dot"></span>
-              {m.connected ? "Online" : "Offline"}
+              {m.connected ? "在线" : "离线"}
             </span>
             <span class="num">{m.balance.toFixed(2)} <span class="muted">{m.currency}</span></span>
             <span class="num subtle">{m.equity.toFixed(2)}</span>
@@ -253,12 +253,12 @@
               {#if m.platform === "TradingView" && !m.connected}
                 <button class="primary sm" on:click={() => connectTradingView(m)}
                         disabled={connectingId === m.id}
-                        title="Open the TradingView proxy + browser">
-                  {connectingId === m.id ? "Connecting…" : "Connect"}
+                        title="打开 TradingView 代理和浏览器">
+                  {connectingId === m.id ? "连接中…" : "连接"}
                 </button>
               {/if}
-              <button class="ghost" title="Demote to unassigned" on:click={() => demoteToIdle(m)}>Unassign</button>
-              <button class="danger icon" title="Remove" on:click={() => removeAccount(m)}>✕</button>
+              <button class="ghost" title="移为未分配" on:click={() => demoteToIdle(m)}>取消分配</button>
+              <button class="danger icon" title="删除" on:click={() => removeAccount(m)}>✕</button>
             </div>
           </div>
 
@@ -269,7 +269,7 @@
                    on:dragstart={(e) => onDragStart(e, slave.id)}
                    on:dragend={onDragEnd}>
                 <span class="tree-mark">↳</span>
-                <span class="role-badge slave-badge">SLAVE</span>
+                <span class="role-badge slave-badge">从账户</span>
                 <span class="chip platform {slave.platform}">{slave.platform}</span>
                 <div class="label-col">
                   {#if editingId === slave.id}
@@ -279,40 +279,40 @@
                       on:keydown={(e) => { if (e.key === "Enter") (e.currentTarget).blur(); if (e.key === "Escape") editingId = null; }}
                       autofocus />
                   {:else}
-                    <button class="label-btn" on:click={() => startEdit(slave)} title="Rename">{slave.label}</button>
+                    <button class="label-btn" on:click={() => startEdit(slave)} title="重命名">{slave.label}</button>
                   {/if}
-                  <span class="muted small">{slave.login || "—"} · {rule.lot_mode} ×{rule.lot_value}{rule.reverse ? " · reverse" : ""}</span>
+                  <span class="muted small">{slave.login || "—"} · {rule.lot_mode} ×{rule.lot_value}{rule.reverse ? " · 反向" : ""}</span>
                 </div>
                 <span class="status-pill" class:online={slave.connected}>
                   <span class="status-dot"></span>
-                  {slave.connected ? "Online" : "Offline"}
+                  {slave.connected ? "在线" : "离线"}
                 </span>
                 <span class="num">{slave.balance.toFixed(2)} <span class="muted">{slave.currency}</span></span>
                 <span class="num subtle">{slave.equity.toFixed(2)}</span>
                 <div class="row-actions">
                   <button class="toggle" class:on={rule.enabled} class:off={!rule.enabled}
-                          title={rule.enabled ? "Click to pause copying" : "Click to resume copying"}
+                          title={rule.enabled ? "点击暂停复制" : "点击恢复复制"}
                           on:click={() => toggleRule(rule)}>
                     <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                    <span class="toggle-label">{rule.enabled ? "Active" : "Paused"}</span>
+                    <span class="toggle-label">{rule.enabled ? "运行中" : "已暂停"}</span>
                   </button>
-                  <button class="ghost icon" title="Unlink from master" on:click={() => unlinkSlave(rule)}>✕</button>
+                  <button class="ghost icon" title="从主账户断开" on:click={() => unlinkSlave(rule)}>✕</button>
                 </div>
               </div>
             {/each}
 
             {#if cands.length > 0}
               <div class="link-zone">
-                <span class="muted small">Attach as slave →</span>
+                <span class="muted small">附加为从账户 →</span>
                 {#each cands as c}
-                  <button class="candidate" title="Link {c.label} as slave" on:click={() => linkSlave(m, c)}>
+                  <button class="candidate" title="将 {c.label} 关联为从账户" on:click={() => linkSlave(m, c)}>
                     + <span class="chip platform {c.platform}">{c.platform}</span>
                     <span>{c.label}</span>
                   </button>
                 {/each}
               </div>
             {:else if children.length === 0}
-              <div class="link-zone subtle"><span class="muted small">No other accounts available — connect another platform first.</span></div>
+              <div class="link-zone subtle"><span class="muted small">暂无其他可用账户——请先连接其他平台。</span></div>
             {/if}
           </div>
         </div>
@@ -326,8 +326,8 @@
              on:drop={onDropOrphan}
              role="region">
           <div class="group-header">
-            <span class="group-title">Unassigned</span>
-            <span class="muted small">{dragId ? 'Drop here to detach from master.' : 'Drag onto a master, click "Make master", or pick a master to attach to.'}</span>
+            <span class="group-title">未分配</span>
+            <span class="muted small">{dragId ? '拖到这里可从主账户分离。' : '拖到某个主账户上，点击"设为主账户"，或选择一个主账户进行关联。'}</span>
           </div>
           {#each unassigned as a (a.id)}
             <div class="row orphan"
@@ -344,13 +344,13 @@
                     on:keydown={(e) => { if (e.key === "Enter") (e.currentTarget).blur(); if (e.key === "Escape") editingId = null; }}
                     autofocus />
                 {:else}
-                  <button class="label-btn" on:click={() => startEdit(a)} title="Rename">{a.label}</button>
+                  <button class="label-btn" on:click={() => startEdit(a)} title="重命名">{a.label}</button>
                 {/if}
                 <span class="muted small">{a.login || "—"}</span>
               </div>
               <span class="status-pill" class:online={a.connected}>
                 <span class="status-dot"></span>
-                {a.connected ? "Online" : "Offline"}
+                {a.connected ? "在线" : "离线"}
               </span>
               <span class="num">{a.balance.toFixed(2)} <span class="muted">{a.currency}</span></span>
               <span class="num subtle">{a.equity.toFixed(2)}</span>
@@ -358,17 +358,17 @@
                 {#if a.platform === "TradingView" && !a.connected}
                   <button class="primary sm" on:click={() => connectTradingView(a)}
                           disabled={connectingId === a.id}
-                          title="Open the TradingView proxy + browser">
-                    {connectingId === a.id ? "Connecting…" : "Connect"}
+                          title="打开 TradingView 代理和浏览器">
+                    {connectingId === a.id ? "连接中…" : "连接"}
                   </button>
                 {/if}
                 {#each masters as m}
-                  <button class="candidate" title="Attach as slave to {m.label}" on:click={() => linkSlave(m, a)}>
+                  <button class="candidate" title="附加为 {m.label} 的从账户" on:click={() => linkSlave(m, a)}>
                     → {m.label}
                   </button>
                 {/each}
-                <button class="primary" on:click={() => promote(a)}>Make master</button>
-                <button class="danger icon" title="Remove" on:click={() => removeAccount(a)}>✕</button>
+                <button class="primary" on:click={() => promote(a)}>设为主账户</button>
+                <button class="danger icon" title="删除" on:click={() => removeAccount(a)}>✕</button>
               </div>
             </div>
           {/each}

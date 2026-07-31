@@ -26,10 +26,10 @@
   async function setupTvProxy() {
     if (tvBusy !== "idle") return;
     tvBusy = "setup";
-    installStatus = { kind: "info", text: "Install in progress" };
+    installStatus = { kind: "info", text: "正在安装…" };
     try {
       tvStatus = await api.tvProxySetup();
-      installStatus = { kind: "ok", text: "Proxy installed. Click Open TradingView to start trading." };
+      installStatus = { kind: "ok", text: "代理已安装。点击“打开 TradingView”开始交易。" };
     } catch (e) {
       installStatus = { kind: "err", text: `${e}` };
     } finally { tvBusy = "idle"; }
@@ -37,10 +37,10 @@
   async function openTvBrowser() {
     if (tvBusy !== "idle") return;
     tvBusy = "open";
-    installStatus = { kind: "info", text: "Launching TradingView in an isolated browser window…" };
+    installStatus = { kind: "info", text: "正在隔离浏览器窗口中启动 TradingView…" };
     try {
       tvStatus = await api.tvProxyOpenBrowser();
-      installStatus = { kind: "ok", text: "TradingView is open. Place any tiny trade — your master account appears here automatically." };
+      installStatus = { kind: "ok", text: "TradingView 已打开。随便下一笔小单 — 你的主账户会自动出现在这里。" };
     } catch (e) {
       installStatus = { kind: "err", text: `${e}` };
     } finally { tvBusy = "idle"; }
@@ -50,7 +50,7 @@
     tvBusy = "stop";
     try {
       tvStatus = await api.tvProxyStop();
-      installStatus = { kind: "info", text: "Proxy stopped." };
+      installStatus = { kind: "info", text: "代理已停止。" };
     } catch (e) {
       installStatus = { kind: "err", text: `${e}` };
     } finally { tvBusy = "idle"; }
@@ -73,60 +73,58 @@
 </script>
 
 <div class="tv-warning">
-  <strong>Under active development</strong> — use with caution.
+  <strong>正在积极开发中</strong> — 请谨慎使用。
 </div>
 <div class="tv-info">
-  <strong>PaperTrading only.</strong> This bridge supports TradingView's PaperTrading account.
-  For a live broker connection (FTMO, OANDA, Forex.com, …), use the <code>cTrader</code>
-  bridge instead — it's more reliable for non-paper accounts.
+  <strong>仅支持模拟盘。</strong> 此桥接支持 TradingView 的模拟盘 (PaperTrading) 账户。
+  如需连接真实经纪商（FTMO、OANDA、Forex.com 等），请改用 <code>cTrader</code>
+  桥接 — 它对非模拟账户更可靠。
 </div>
 <div class="tv-info">
-  <strong>PaperTrading is feature-limited.</strong> TV's simulated account behaves differently
-  from a real broker on edge cases (partial closes, instant-fill pendings, netting merges,
-  intermediate SL/TP frames). <em>Run your own functional tests</em> with small trades
-  end-to-end before relying on it. If anything looks off, prefer <code>cTrader</code> or
-  <code>MT4</code>/<code>MT5</code> as the master — those are battle-tested and the bridge
-  semantics are stable.
+  <strong>模拟盘功能有限。</strong> 在边界情况下（部分平仓、即时成交的挂单、净额合并、
+  中间的止损/止盈帧），TV 的模拟账户表现与真实经纪商不同。<em>请先使用小额交易</em>
+  做端到端功能测试，确认无误后再依赖它。若发现任何异常，建议以 <code>cTrader</code>
+  或 <code>MT4</code>/<code>MT5</code> 作为主账户 — 这些经过实战检验，桥接语义稳定。
 </div>
 <div class="tv-info">
-  <strong>Netting → hedging mapping.</strong> TV PaperTrading nets all entries on a symbol
-  into one position; the slave broker (MT4/MT5/cTrader) sees each entry as a <em>separate</em>
-  position. Two successive buys of 1 BTC in TV produce two distinct 1 BTC positions on the
-  slave. SL/TP changes apply to all of them; closing in TV closes them all.
+  <strong>净额 → 对冲映射。</strong> TV 模拟盘会把同一品种的所有开仓合并为一个净额持仓；
+  从账户经纪商（MT4/MT5/cTrader）会把每一笔开仓视为<em>独立</em>持仓。
+  在 TV 中连续两次各买入 1 BTC，会在从账户上产生两个独立的 1 BTC 持仓。
+  止损/止盈的改动会作用于所有持仓；在 TV 中平仓会全部平掉。
 </div>
 <div class="tv-status">
   <span class="tv-pill {tvStatus?.running ? 'on' : tvStatus?.installed ? 'idle' : 'off'}">
-    {tvStatus?.running ? `Running on :${tvStatus.port}` : tvStatus?.installed ? "Installed · stopped" : "Not installed"}
+    {tvStatus?.running ? `正在运行于端口 :${tvStatus.port}` : tvStatus?.installed ? "已安装 · 已停止" : "未安装"}
   </span>
   {#if tvStatus?.pythonVersion}
     <span class="muted small">Python {tvStatus.pythonVersion}</span>
   {/if}
   {#if tvStatus?.lastError}
-    <span class="tv-err small" title={tvStatus.lastError}>last error: {tvStatus.lastError.length > 60 ? tvStatus.lastError.slice(0, 60) + "…" : tvStatus.lastError}</span>
+    <span class="tv-err small" title={tvStatus.lastError}>上次错误：{tvStatus.lastError.length > 60 ? tvStatus.lastError.slice(0, 60) + "…" : tvStatus.lastError}</span>
   {/if}
 </div>
 {#if pythonMissing}
   <div class="py-required">
     <div class="py-required-head">
-      <strong>Python 3.10+ is required</strong>
-      <span class="muted small">Cascada uses Python to run the mitmproxy sidecar that talks to TradingView.</span>
+      <strong>需要 Python 3.10 或更高版本</strong>
+      <span class="muted small">Cascada 使用 Python 运行 mitmproxy 辅助进程来与 TradingView 通信。</span>
     </div>
     <ol class="py-steps">
-      <li>Download &amp; install Python 3.10 or newer.</li>
-      <li><strong>Windows users:</strong> in the installer, tick <em>“Add Python to PATH”</em> on the first screen — that's the most common reason setup fails.</li>
-      <li>Come back here and click <em>Retry install</em>.</li>
+      <li>下载并安装 Python 3.10 或更新版本。</li>
+      <li><strong>Windows 用户：</strong>在安装向导的第一个界面勾选 <em>“Add Python to PATH”</em> — 这是安装失败最常见的原因。</li>
+      <li>回到此处并点击 <em>重试安装</em>。</li>
     </ol>
     <div class="install-row">
-      <a class="btn-link primary" href="https://www.python.org/downloads/" target="_blank" rel="noreferrer">Download Python →</a>
+      <a class="btn-link primary" href="https://www.python.org/downloads/" target="_blank" rel="noreferrer">下载 Python →</a>
       <button on:click={setupTvProxy} disabled={tvBusy !== "idle"}>
-        {tvBusy === "setup" ? "Retrying…" : "Retry install"}
+        {tvBusy === "setup" ? "重试中…" : "重试安装"}
       </button>
     </div>
   </div>
 {:else if tvStatus && !tvStatus.installed}
   <div class="install-row">
     <button class="primary" on:click={setupTvProxy} disabled={tvBusy !== "idle"}>
-      {#if tvBusy === "setup"}<span class="spinner" aria-hidden="true"></span>Installing…{:else}Install proxy{/if}
+      {#if tvBusy === "setup"}<span class="spinner" aria-hidden="true"></span>正在安装…{:else}安装代理{/if}
     </button>
   </div>
   {#if tvBusy === "setup"}
@@ -137,37 +135,37 @@
 {:else if tvStatus && !tvStatus.browserPath}
   <div class="browser-required">
     <div class="py-required-head">
-      <strong>Chrome, Edge, or Brave required</strong>
-      <span class="muted small">Cascada launches TradingView in an isolated window — pick any Chromium-based browser.</span>
+      <strong>需要 Chrome、Edge 或 Brave</strong>
+      <span class="muted small">Cascada 会在隔离窗口中启动 TradingView — 请选择任意基于 Chromium 的浏览器。</span>
     </div>
     <div class="install-row">
-      <a class="btn-link primary" href="https://www.google.com/chrome/" target="_blank" rel="noreferrer">Download Chrome →</a>
-      <a class="btn-link" href="https://www.microsoft.com/edge" target="_blank" rel="noreferrer">Download Edge</a>
-      <button on:click={refreshTvStatus} disabled={tvBusy !== "idle"}>I've installed it</button>
+      <a class="btn-link primary" href="https://www.google.com/chrome/" target="_blank" rel="noreferrer">下载 Chrome →</a>
+      <a class="btn-link" href="https://www.microsoft.com/edge" target="_blank" rel="noreferrer">下载 Edge</a>
+      <button on:click={refreshTvStatus} disabled={tvBusy !== "idle"}>我已安装</button>
     </div>
   </div>
 {:else}
   <div class="install-row">
     <button class="primary" on:click={openTvBrowser} disabled={tvBusy !== "idle" || !tvStatus?.browserReady}>
-      {#if tvBusy === "open"}<span class="spinner" aria-hidden="true"></span>Opening…{:else}Open TradingView →{/if}
+      {#if tvBusy === "open"}<span class="spinner" aria-hidden="true"></span>正在打开…{:else}打开 TradingView →{/if}
     </button>
     {#if tvStatus?.running}
-      <button on:click={stopTvProxy} disabled={tvBusy !== "idle"} title="Stop the mitmproxy sidecar (closes the proxy, the browser window stays)">
-        {tvBusy === "stop" ? "Stopping…" : "Stop proxy"}
+      <button on:click={stopTvProxy} disabled={tvBusy !== "idle"} title="停止 mitmproxy 辅助进程（关闭代理，浏览器窗口保留）">
+        {tvBusy === "stop" ? "正在停止…" : "停止代理"}
       </button>
     {/if}
-    <button on:click={setupTvProxy} disabled={tvBusy !== "idle"} title="Reinstall the venv and refresh the cert (rare)">
-      Reinstall
+    <button on:click={setupTvProxy} disabled={tvBusy !== "idle"} title="重新安装虚拟环境并刷新证书（很少用到）">
+      重新安装
     </button>
   </div>
   <p class="hint">
-    Cascada will open TradingView in {tvStatus?.browserPath?.includes("Edge") ? "Edge" : tvStatus?.browserPath?.includes("Brave") ? "Brave" : "Chrome"} with a sandboxed profile.
-    Place any tiny trade once you're in — your master account appears here automatically.
+    Cascada 将使用 {tvStatus?.browserPath?.includes("Edge") ? "Edge" : tvStatus?.browserPath?.includes("Brave") ? "Brave" : "Chrome"} 以及沙箱配置文件打开 TradingView。
+    登录后随便下一笔小单 — 你的主账户会自动出现在这里。
   </p>
   <p class="hint">
-    Email/password and Google/Apple OAuth all work — Cascada tunnels Google + Apple
-    auth domains around mitmproxy so Chrome accepts the real provider cert. TradingView
-    traffic itself stays intercepted.
+    邮箱/密码以及 Google/Apple OAuth 均可正常使用 — Cascada 会将 Google + Apple
+    认证域名绕过 mitmproxy，使 Chrome 接受提供方的真实证书。TradingView
+    流量本身仍会被拦截。
   </p>
 {/if}
 

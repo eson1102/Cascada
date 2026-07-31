@@ -565,7 +565,7 @@
       dispatch("refresh"); // tell App.svelte to re-fetch rules so Rules tab + matchingRules reflect the new offset
     } catch (e) {
       console.error("upsertRule failed", e);
-      alert("Failed to update rule: " + e);
+      alert("更新规则失败：" + e);
     }
   }
 
@@ -591,7 +591,7 @@
       dispatch("refresh"); // sync App.svelte → Rules tab will see the new rule too
     } catch (e) {
       console.error("create rule failed", e);
-      alert("Failed to create rule: " + e);
+      alert("创建规则失败：" + e);
     }
   }
 
@@ -697,26 +697,26 @@
 <div class="compare">
   <header class="hd">
     <div class="hd-title">
-      <h2>Quote compare</h2>
+      <h2>报价对比</h2>
       {#if isLive(masterId) || isLive(slaveId)}
-        <span class="live-pill"><span class="live-dot"></span> live</span>
+        <span class="live-pill"><span class="live-dot"></span> 实时</span>
       {/if}
     </div>
-    <p class="sub">Live bid/ask side-by-side. Capture the median pip diff over a window, then push it straight into a copy rule.</p>
+    <p class="sub">实时买卖价并排对比。在一段时间内采集点数中位差，然后直接写入复制规则。</p>
   </header>
 
   {#if masters.length === 0 || slaves.length === 0}
     <div class="empty">
       <div class="empty-icon">⇄</div>
-      <p>You need at least one <strong>Master</strong> and one <strong>Slave</strong> account to compare quotes.</p>
+      <p>至少需要一个<strong>主账户 (master)</strong>和一个<strong>从账户 (slave)</strong>才能对比报价。</p>
     </div>
   {:else}
     <div class="picker">
       <!-- Master card -->
       <div class="acct-card master">
         <div class="acct-head">
-          <span class="lbl-tag">Master</span>
-          <span class="live-state" class:on={isLive(masterId)} title={isLive(masterId) ? "Receiving quotes" : "No recent quote"}>
+          <span class="lbl-tag">主账户 (master)</span>
+          <span class="live-state" class:on={isLive(masterId)} title={isLive(masterId) ? "接收报价中" : "暂无最新报价"}>
             <span class="live-dot"></span>
           </span>
         </div>
@@ -727,9 +727,9 @@
           </select>
         </div>
         <div class="acct-meta">
-          <span class="login-chip" title="Broker login">#{masterAcct?.login ?? "—"}</span>
+          <span class="login-chip" title="经纪商登录号">#{masterAcct?.login ?? "—"}</span>
           <button class="sym-pill"
-                  title="Ask the EA to dump its symbol list"
+                  title="请求 EA 导出其品种列表"
                   disabled={loadingSymbols.has(masterId)}
                   on:click={() => refreshSymbols(masterId)}>
             {#if loadingSymbols.has(masterId)}
@@ -737,31 +737,30 @@
             {:else}
               ↻
             {/if}
-            <strong>{masterSymbols.length || 0}</strong> symbols
+            <strong>{masterSymbols.length || 0}</strong> 个品种
           </button>
         </div>
         {#if masterIsTv}
           <div class="feed-row">
-            <label class="feed-label" for="tv-feed-select">Data feed</label>
+            <label class="feed-label" for="tv-feed-select">数据源</label>
             <select id="tv-feed-select" class="feed-select"
-                    title="Apply this data feed to EVERY row at once. Each row also has its own selector to mix feeds."
+                    title="将此数据源一次性应用到所有行。每一行也各有选择器，可混合数据源。"
                     value={masterFeed}
                     on:change={(e) => setAllFeeds(e.currentTarget.value)}>
-              <option value="">— bare ticker</option>
+              <option value="">— 裸代码</option>
               {#each tvFeeds as f}
                 <option value={f}>
                   {f.endsWith(":") ? f.slice(0, -1) : f.slice(1)}
                   &nbsp;
-                  <span class="feed-fmt">{f.endsWith(":") ? "(prefix)" : "(suffix)"}</span>
+                  <span class="feed-fmt">{f.endsWith(":") ? "（前缀）" : "（后缀）"}</span>
                 </option>
               {/each}
             </select>
           </div>
           <div class="tv-hint">
-            TradingView only lists symbols you've opened in a chart or watchlist
-            within the Cascada browser. Pick a data feed above (<code>OANDA</code>,
-            <code>PEPPERSTONE</code>, <code>BITSTAMP</code>, …) and it's applied to
-            every Symbol in the table at once. Empty = no prefix.
+            TradingView 仅列出您在 Cascada 浏览器中打开过图表或加入自选列表的品种。
+            选择上方的一个数据源 (<code>OANDA</code>、<code>PEPPERSTONE</code>、<code>BITSTAMP</code>、…)，
+            它会被一次性应用到表中所有品种。留空 = 无前缀。
           </div>
         {/if}
       </div>
@@ -778,8 +777,8 @@
       <!-- Slave card -->
       <div class="acct-card slave">
         <div class="acct-head">
-          <span class="lbl-tag slave-tag">Slave</span>
-          <span class="live-state" class:on={isLive(slaveId)} title={isLive(slaveId) ? "Receiving quotes" : "No recent quote"}>
+          <span class="lbl-tag slave-tag">从账户 (slave)</span>
+          <span class="live-state" class:on={isLive(slaveId)} title={isLive(slaveId) ? "接收报价中" : "暂无最新报价"}>
             <span class="live-dot"></span>
           </span>
         </div>
@@ -790,9 +789,9 @@
           </select>
         </div>
         <div class="acct-meta">
-          <span class="login-chip" title="Broker login">#{slaveAcct?.login ?? "—"}</span>
+          <span class="login-chip" title="经纪商登录号">#{slaveAcct?.login ?? "—"}</span>
           <button class="sym-pill"
-                  title="Ask the EA to dump its symbol list"
+                  title="请求 EA 导出其品种列表"
                   disabled={loadingSymbols.has(slaveId)}
                   on:click={() => refreshSymbols(slaveId)}>
             {#if loadingSymbols.has(slaveId)}
@@ -800,7 +799,7 @@
             {:else}
               ↻
             {/if}
-            <strong>{slaveSymbols.length || 0}</strong> symbols
+            <strong>{slaveSymbols.length || 0}</strong> 个品种
           </button>
         </div>
       </div>
@@ -814,22 +813,22 @@
       <table>
         <thead>
           <tr>
-            <th class="grp grp-m" colspan="4">Master</th>
+            <th class="grp grp-m" colspan="4">主账户 (master)</th>
             <th class="grp grp-d">Δ</th>
-            <th class="grp grp-s" colspan="4">Slave</th>
-            <th class="grp grp-c">Capture</th>
+            <th class="grp grp-s" colspan="4">从账户 (slave)</th>
+            <th class="grp grp-c">采集</th>
             <th class="grp"></th>
           </tr>
           <tr class="sub-head">
-            <th class="sym mcell">Symbol</th>
-            <th class="num mcell">Bid</th>
-            <th class="num mcell">Ask</th>
-            <th class="num mcell sep">Sprd</th>
-            <th class="num diff-h">pips</th>
-            <th class="sym scell">Symbol</th>
-            <th class="num scell">Bid</th>
-            <th class="num scell">Ask</th>
-            <th class="num scell sep">Sprd</th>
+            <th class="sym mcell">品种</th>
+            <th class="num mcell">买价</th>
+            <th class="num mcell">卖价</th>
+            <th class="num mcell sep">点差</th>
+            <th class="num diff-h">点数</th>
+            <th class="sym scell">品种</th>
+            <th class="num scell">买价</th>
+            <th class="num scell">卖价</th>
+            <th class="num scell sep">点差</th>
             <th class="capture-col"></th>
             <th></th>
           </tr>
@@ -849,7 +848,7 @@
                 <div class="sym-row">
                   {#if masterIsTv}
                     <select class="row-feed"
-                            title="Per-row data feed override"
+                            title="单行数据源覆盖"
                             value={rowFeed}
                             on:change={(e) => { p.masterFeed = e.currentTarget.value; applySubscription(); }}>
                       <option value="">—</option>
@@ -880,7 +879,7 @@
                 {/if}
               </td>
               <td class="sym scell">
-                <input class="sym-input" type="text" list="dl-slave" placeholder="(same as master)"
+                <input class="sym-input" type="text" list="dl-slave" placeholder="（与主账户相同）"
                        autocomplete="off" autocorrect="off" spellcheck="false"
                        bind:value={p.slave}
                        on:change={applySubscription} />
@@ -901,31 +900,31 @@
                     </select>
                     <button class="cap-btn"
                             disabled={!p.master || !masterId || !slaveId}
-                            on:click={() => startCapture(i)}>● Capture</button>
+                            on:click={() => startCapture(i)}>● 采集</button>
                   </div>
                 {:else if samp.medianPips === undefined}
                   <div class="cap-progress">
                     <div class="cap-bar" style="width: {Math.min(100, (samp.elapsedMs / samp.durationMs) * 100)}%"></div>
-                    <span class="cap-text">{Math.max(0, Math.ceil((samp.durationMs - samp.elapsedMs) / 1000))}s · {samp.samples.length} ticks</span>
-                    <button class="cap-cancel" title="Cancel" on:click={() => cancelCapture(i)}>✕</button>
+                    <span class="cap-text">{Math.max(0, Math.ceil((samp.durationMs - samp.elapsedMs) / 1000))}s · {samp.samples.length} 个报价</span>
+                    <button class="cap-cancel" title="取消" on:click={() => cancelCapture(i)}>✕</button>
                   </div>
                 {:else if samp.samples.length === 0 || !Number.isFinite(samp.medianPips)}
                   <div class="cap-result">
-                    <span class="cap-warn" title="No quotes arrived during the capture window. Make sure the cBot/EA is loaded on this account, then press Stream.">
-                      no samples — EA not streaming?
+                    <span class="cap-warn" title="采集期间未收到任何报价。请确保此账户已加载 cBot/EA，然后点击流 (Stream)。">
+                      无样本 — EA 未在推送报价？
                     </span>
-                    <button class="cap-cancel" title="Reset" on:click={() => cancelCapture(i)}>↺</button>
+                    <button class="cap-cancel" title="重置" on:click={() => cancelCapture(i)}>↺</button>
                   </div>
                 {:else}
                   <div class="cap-result">
-                    <span class="cap-median" title="{samp.samples.length} samples">
-                      median {samp.medianPips > 0 ? "+" : ""}{samp.medianPips.toFixed(2)}p
+                    <span class="cap-median" title="{samp.samples.length} 个样本">
+                      中位数 {samp.medianPips > 0 ? "+" : ""}{samp.medianPips.toFixed(2)}p
                     </span>
                     {#if matchingRules.length === 0}
                       <button class="cap-apply"
-                              title="Create a new copy rule for this Master ↔ Slave pair, with the captured offset pre-filled"
+                              title="为此主账户 ↔ 从账户组合创建新的复制规则，并预填已采集的偏移值"
                               on:click={() => createRuleFromCapture(i)}>
-                        + Create rule
+                        + 创建规则
                       </button>
                     {:else if matchingRules.length === 1}
                       {@const r0 = matchingRules[0]}
@@ -934,34 +933,34 @@
                       {@const upToDate0 = ruleHasOffset(r0, sym0, feed0, Number(samp.medianPips.toFixed(2)))}
                       <button class="cap-apply"
                               disabled={samp.appliedRuleIds.has(r0.id) || upToDate0}
-                              title={upToDate0 ? "This rule already carries the same offset for this symbol" : ""}
+                              title={upToDate0 ? "该规则已包含此品种的相同偏移值" : ""}
                               on:click={() => applyToRule(i, r0.id)}>
                         {samp.appliedRuleIds.has(r0.id)
-                          ? "✓ Saved"
+                          ? "✓ 已保存"
                           : upToDate0
-                            ? "✓ Already set"
-                            : `→ ${r0.name?.trim() || "rule"}`}
+                            ? "✓ 已设置"
+                            : `→ ${r0.name?.trim() || "规则"}`}
                       </button>
                     {:else}
                       {@const sym0 = pairs[i].master.trim().toUpperCase()}
                       {@const feed0 = ((pairs[i].masterFeed ?? masterFeed) || "").toUpperCase()}
                       {@const pips0 = Number(samp.medianPips.toFixed(2))}
                       <select class="cap-rule" on:change={(e) => { const v = e.currentTarget.value; if (v) applyToRule(i, v); }}>
-                        <option value="">Apply to rule…</option>
+                        <option value="">应用到规则…</option>
                         {#each matchingRules as r}
                           {@const upToDate = ruleHasOffset(r, sym0, feed0, pips0)}
                           <option value={r.id} disabled={samp.appliedRuleIds.has(r.id) || upToDate}>
-                            {r.name?.trim() || "Untitled"}{samp.appliedRuleIds.has(r.id) ? " ✓" : upToDate ? " (à jour)" : ""}
+                            {r.name?.trim() || "未命名"}{samp.appliedRuleIds.has(r.id) ? " ✓" : upToDate ? "（已最新）" : ""}
                           </option>
                         {/each}
                       </select>
                     {/if}
-                    <button class="cap-cancel" title="Reset" on:click={() => cancelCapture(i)}>↺</button>
+                    <button class="cap-cancel" title="重置" on:click={() => cancelCapture(i)}>↺</button>
                   </div>
                 {/if}
               </td>
               <td class="actions-cell">
-                <button class="row-x" title="Remove pair" on:click={() => removeRow(i)}>✕</button>
+                <button class="row-x" title="移除组合" on:click={() => removeRow(i)}>✕</button>
               </td>
             </tr>
           {/each}
@@ -969,30 +968,30 @@
       </table>
     </div>
     <div class="footer-row">
-      <button class="add-row" on:click={addRow}>+ Add pair</button>
+      <button class="add-row" on:click={addRow}>+ 添加组合</button>
       <div class="presets">
-        <span class="presets-label">Quick-add:</span>
+        <span class="presets-label">快速添加：</span>
         <button class="preset-pill primary"
-                title={`Add the 28 major FX crosses (${MAJORS.length} pairs: all combinations of USD, EUR, JPY, GBP, AUD, NZD, CAD, CHF)`}
+                title={`添加 ${MAJORS.length} 个主要外汇货币对（共 ${MAJORS.length} 个组合：USD、EUR、JPY、GBP、AUD、NZD、CAD、CHF 的全部两两组合）`}
                 on:click={() => addPreset(MAJORS)}>
-          + All majors <span class="count">({MAJORS.length})</span>
+          + 全部主要货币对 <span class="count">({MAJORS.length})</span>
         </button>
         <button class="preset-pill metal"
-                title="Add gold (XAUUSD) and silver (XAGUSD)"
+                title="添加黄金 (XAUUSD) 和白银 (XAGUSD)"
                 on:click={() => addPreset(METALS)}>
-          + Metals <span class="count">({METALS.length})</span>
+          + 贵金属 <span class="count">({METALS.length})</span>
         </button>
         {#if masterId && slaveId && capturableCount > 0}
           <span class="presets-divider"></span>
           <button class="preset-pill capture"
-                  title={`Start capture on the ${capturableCount} pair(s) not already sampling — one click instead of row-by-row`}
+                  title={`对尚未采集的 ${capturableCount} 个组合开始采集 — 一次点击，无需逐行操作`}
                   on:click={startCaptureAll}>
-            ● Capture all <span class="count">({capturableCount})</span>
+            ● 全部采集 <span class="count">({capturableCount})</span>
           </button>
         {/if}
       </div>
       <p class="hint">
-        Δ = (slave mid − master mid) / pip · positive = slave quotes higher than master.
+        Δ =（从账户中间价 − 主账户中间价）/ 点 · 正值表示从账户报价高于主账户。
       </p>
     </div>
   {/if}

@@ -33,13 +33,20 @@
     return list;
   }
 
+  function roleLabel(role: string): string {
+    if (role === "Master") return "主账户 (master)";
+    if (role === "Slave") return "从账户 (slave)";
+    if (role === "Idle") return "空闲 (idle)";
+    return role;
+  }
+
   function ruleIssue(r: CopyRule): string | null {
     const m = idx.get(r.master_id);
     const s = idx.get(r.slave_id);
-    if (!m) return "Master account missing";
-    if (!s) return "Slave account missing";
-    if (m.role !== "Master") return `Master is now ${m.role}`;
-    if (s.role !== "Slave") return `Slave is now ${s.role}`;
+    if (!m) return "缺少主账户 (master)";
+    if (!s) return "缺少从账户 (slave)";
+    if (m.role !== "Master") return `主账户现在是 ${m.role}`;
+    if (s.role !== "Slave") return `从账户现在是 ${s.role}`;
     return null;
   }
 
@@ -95,10 +102,10 @@
     const m = idx.get(r.master_id);
     const s = idx.get(r.slave_id);
     const pair = m && s ? ` (${labelOf(idx, r.master_id)} → ${labelOf(idx, r.slave_id)})` : "";
-    const name = r.name?.trim() || "this rule";
+    const name = r.name?.trim() || "此规则";
     const ok = await ask(
-      `Delete "${name}"${pair}?\n\nNew master trades will no longer be copied to this slave under this rule. Existing open positions are not touched.`,
-      { title: "Delete copy rule?", kind: "warning", okLabel: "Delete", cancelLabel: "Cancel" });
+      `删除“${name}”${pair}？\n\n此后主账户的新交易将不再通过此规则复制到该从账户。现有持仓不受影响。`,
+      { title: "删除复制规则？", kind: "warning", okLabel: "删除", cancelLabel: "取消" });
     if (!ok) return;
     await api.deleteRule(r.id);
     dispatch("refresh");
@@ -118,40 +125,40 @@
   }
 
   const LOT_MODES: { id: LotMode; label: string; hint: string; icon: string }[] = [
-    { id: "Multiplier",   label: "Multiplier",     hint: "slave = master × value",            icon: "✕" },
-    { id: "Fixed",        label: "Fixed lots",     hint: "always open `value` lots",          icon: "▣" },
-    { id: "Equity",       label: "Equity ratio",   hint: "scale by equity ratio × value",     icon: "≈" },
-    { id: "BalanceRatio", label: "Balance ratio",  hint: "scale by balance ratio × value",    icon: "⚖" },
-    { id: "RiskPercent",  label: "Risk %",         hint: "size by SL distance vs equity %",   icon: "%" },
+    { id: "Multiplier",   label: "倍数",           hint: "从账户 = 主账户 × 值",              icon: "✕" },
+    { id: "Fixed",        label: "固定手数",       hint: "始终开 `value` 手",                 icon: "▣" },
+    { id: "Equity",       label: "净值比例",       hint: "按净值比例 × 值缩放",               icon: "≈" },
+    { id: "BalanceRatio", label: "余额比例",       hint: "按余额比例 × 值缩放",               icon: "⚖" },
+    { id: "RiskPercent",  label: "风险比例",       hint: "按止损距离相对净值 % 计算手数",     icon: "%" },
   ];
 
   type Chip = { kind: "info" | "warn" | "danger" | "primary"; text: string };
   function chipsForRule(r: CopyRule): Chip[] {
     const out: Chip[] = [];
-    out.push({ kind: "primary", text: r.lot_mode === "RiskPercent" ? `${r.lot_value}% risk` : `${r.lot_mode} ×${r.lot_value}` });
-    if (r.reverse) out.push({ kind: "warn", text: "reverse" });
-    if (r.direction !== "All") out.push({ kind: "info", text: r.direction === "BuyOnly" ? "buy only" : "sell only" });
-    if (r.symbol_whitelist.length) out.push({ kind: "info", text: `whitelist · ${r.symbol_whitelist.length}` });
-    if (r.symbol_blacklist.length) out.push({ kind: "warn", text: `blacklist · ${r.symbol_blacklist.length}` });
+    out.push({ kind: "primary", text: r.lot_mode === "RiskPercent" ? `${r.lot_value}% 风险` : `${LOT_MODES.find((m) => m.id === r.lot_mode)?.label ?? r.lot_mode} ×${r.lot_value}` });
+    if (r.reverse) out.push({ kind: "warn", text: "反向" });
+    if (r.direction !== "All") out.push({ kind: "info", text: r.direction === "BuyOnly" ? "仅买入" : "仅卖出" });
+    if (r.symbol_whitelist.length) out.push({ kind: "info", text: `白名单 · ${r.symbol_whitelist.length}` });
+    if (r.symbol_blacklist.length) out.push({ kind: "warn", text: `黑名单 · ${r.symbol_blacklist.length}` });
     if (r.symbol_prefix || r.symbol_suffix) out.push({ kind: "info", text: `${r.symbol_prefix}…${r.symbol_suffix}` });
     const mapN = Object.keys(r.symbol_map ?? {}).length;
-    if (mapN) out.push({ kind: "info", text: `map · ${mapN}` });
-    if (r.sl_mode !== "Copy") out.push({ kind: "info", text: `SL ${r.sl_mode === "Fixed" ? r.sl_pips + "p" : "off"}` });
-    if (r.tp_mode !== "Copy") out.push({ kind: "info", text: `TP ${r.tp_mode === "Fixed" ? r.tp_pips + "p" : "off"}` });
-    if (r.trailing_pips)       out.push({ kind: "info", text: `trail ${r.trailing_pips}p` });
-    if (r.breakeven_after_pips)out.push({ kind: "info", text: `BE +${r.breakeven_after_pips}p` });
-    if (r.max_slippage_pips)   out.push({ kind: "info", text: `slip ≤ ${r.max_slippage_pips}p` });
-    if (r.min_lot)             out.push({ kind: "info", text: `min ${r.min_lot} lot` });
-    if (r.max_lot)             out.push({ kind: "info", text: `max ${r.max_lot} lot` });
+    if (mapN) out.push({ kind: "info", text: `映射 · ${mapN}` });
+    if (r.sl_mode !== "Copy") out.push({ kind: "info", text: `止损 ${r.sl_mode === "Fixed" ? r.sl_pips + "p" : "关"}` });
+    if (r.tp_mode !== "Copy") out.push({ kind: "info", text: `止盈 ${r.tp_mode === "Fixed" ? r.tp_pips + "p" : "关"}` });
+    if (r.trailing_pips)       out.push({ kind: "info", text: `移动止损 ${r.trailing_pips}p` });
+    if (r.breakeven_after_pips)out.push({ kind: "info", text: `保本 +${r.breakeven_after_pips}p` });
+    if (r.max_slippage_pips)   out.push({ kind: "info", text: `滑点 ≤ ${r.max_slippage_pips}p` });
+    if (r.min_lot)             out.push({ kind: "info", text: `最小 ${r.min_lot} 手` });
+    if (r.max_lot)             out.push({ kind: "info", text: `最大 ${r.max_lot} 手` });
     const offN = r.quote_offsets?.length ?? 0;
-    if (offN)                  out.push({ kind: "info", text: `offset · ${offN}` });
-    if (r.comment_filter)      out.push({ kind: "info", text: `cmt “${r.comment_filter}”` });
-    if (r.skip_older_than_secs)out.push({ kind: "info", text: `skip >${r.skip_older_than_secs}s` });
-    if (r.max_open_positions) out.push({ kind: "info", text: `≤ ${r.max_open_positions} pos` });
-    if (r.max_exposure_lots)  out.push({ kind: "info", text: `≤ ${r.max_exposure_lots} lots` });
-    if (r.max_daily_loss)     out.push({ kind: "danger", text: `−${r.max_daily_loss} stop` });
+    if (offN)                  out.push({ kind: "info", text: `偏差 · ${offN}` });
+    if (r.comment_filter)      out.push({ kind: "info", text: `备注 “${r.comment_filter}”` });
+    if (r.skip_older_than_secs)out.push({ kind: "info", text: `跳过 >${r.skip_older_than_secs}s` });
+    if (r.max_open_positions) out.push({ kind: "info", text: `≤ ${r.max_open_positions} 持仓` });
+    if (r.max_exposure_lots)  out.push({ kind: "info", text: `≤ ${r.max_exposure_lots} 手` });
+    if (r.max_daily_loss)     out.push({ kind: "danger", text: `−${r.max_daily_loss} 触发停止` });
     if (r.schedule.enabled)   out.push({ kind: "info", text: `${minToHHMM(r.schedule.start_min)}–${minToHHMM(r.schedule.end_min)}` });
-    if (r.schedule.skip_weekends) out.push({ kind: "info", text: "wkdays" });
+    if (r.schedule.skip_weekends) out.push({ kind: "info", text: "仅工作日" });
     if (r.trade_delay_ms)     out.push({ kind: "info", text: `+${r.trade_delay_ms}ms` });
     return out;
   }
@@ -173,23 +180,23 @@
   $: issuesCount = ruleMeta.issues;
 
   const TABS: { id: TabId; label: string; icon: string; desc: string }[] = [
-    { id: "lot",      label: "Lot sizing",    icon: "⚖", desc: "How slave volume is computed" },
-    { id: "filters",  label: "Filters",       icon: "⛃", desc: "Which trades & symbols to copy" },
-    { id: "risk",     label: "Risk caps",     icon: "🛡", desc: "Per-slave safety limits" },
-    { id: "orders",   label: "Order shaping", icon: "✎", desc: "SL/TP, slippage, delay" },
-    { id: "schedule", label: "Schedule",      icon: "⏱", desc: "Time-of-day window" },
-    { id: "advanced", label: "Advanced",      icon: "⚙", desc: "Trailing & break-even" },
+    { id: "lot",      label: "手数设置",   icon: "⚖", desc: "从账户手数的计算方式" },
+    { id: "filters",  label: "筛选",       icon: "⛃", desc: "复制哪些交易与品种" },
+    { id: "risk",     label: "风险上限",   icon: "🛡", desc: "每个从账户的安全限制" },
+    { id: "orders",   label: "订单设置",   icon: "✎", desc: "止损/止盈、滑点、延迟" },
+    { id: "schedule", label: "时段",       icon: "⏱", desc: "每日交易时段" },
+    { id: "advanced", label: "高级",       icon: "⚙", desc: "移动止损与保本" },
   ];
 </script>
 
 <div class="card rules-root">
   <div class="card-header">
     <div class="header-left">
-      <h2>Copy rules</h2>
+      <h2>复制规则</h2>
       <span class="count-pill">{rules.length}</span>
     </div>
     <button class="primary btn-new" on:click={newDraft} disabled={!!editing}>
-      <span class="plus">+</span> New rule
+      <span class="plus">+</span> 新建规则
     </button>
   </div>
 
@@ -197,8 +204,8 @@
     <div class="banner-warn">
       <span class="banner-icon">⚠</span>
       <div class="banner-body">
-        <div class="banner-title">{issuesCount} rule{issuesCount > 1 ? "s" : ""} need{issuesCount > 1 ? "" : "s"} your attention</div>
-        <div class="banner-sub">A referenced master or slave account no longer matches the role expected by the rule. Reassign or delete the affected rules below.</div>
+        <div class="banner-title">{issuesCount} 条规则需要您处理</div>
+        <div class="banner-sub">规则引用的主账户或从账户已不再匹配规则要求的角色。请在下方重新指派或删除受影响的规则。</div>
       </div>
     </div>
   {/if}
@@ -206,12 +213,12 @@
   {#if rules.length === 0}
     <div class="empty-state">
       <div class="empty-glyph">⇄</div>
-      <h3 class="empty-title">No copy rules yet</h3>
+      <h3 class="empty-title">还没有复制规则</h3>
       <p class="empty-sub">
-        Mark one account as <b>Master</b> and another as <b>Slave</b> in the Accounts tab,
-        then create a rule here to start mirroring trades.
+        在账户 (Accounts) 标签页中将一个账户标记为<b>主账户 (master)</b>、另一个标记为<b>从账户 (slave)</b>，
+        然后在此创建规则以开始镜像交易。
       </p>
-      <button class="primary" on:click={newDraft}>+ Create your first rule</button>
+      <button class="primary" on:click={newDraft}>+ 创建第一条规则</button>
     </div>
   {:else}
     <div class="rule-list">
@@ -225,7 +232,7 @@
           <div class="rule-main">
             <div class="rule-name-row">
               <h4 class="rule-name" class:untitled={!r.name?.trim()}>
-                {r.name?.trim() || "Untitled rule"}
+                {r.name?.trim() || "未命名规则"}
               </h4>
               {#if issue}
                 <span class="warn-pill" title={issue}>⚠ {issue}</span>
@@ -234,7 +241,7 @@
 
             <div class="rule-flow">
               <div class="acc-block">
-                <span class="role-tag master">MASTER</span>
+                <span class="role-tag master">主账户 (master)</span>
                 <div class="acc-line">
                   <span class="chip platform {platformOf(idx, r.master_id)}">{platformOf(idx, r.master_id)}</span>
                   <span class="acc-label">{labelOf(idx, r.master_id)}</span>
@@ -247,7 +254,7 @@
               </div>
 
               <div class="acc-block">
-                <span class="role-tag slave">SLAVE</span>
+                <span class="role-tag slave">从账户 (slave)</span>
                 <div class="acc-line">
                   <span class="chip platform {platformOf(idx, r.slave_id)}">{platformOf(idx, r.slave_id)}</span>
                   <span class="acc-label">{labelOf(idx, r.slave_id)}</span>
@@ -264,13 +271,13 @@
 
           <div class="rule-actions">
             <button class="toggle" class:on={r.enabled}
-                    title={r.enabled ? "Pause copying" : "Resume copying"}
+                    title={r.enabled ? "暂停复制" : "恢复复制"}
                     on:click={() => toggle(r)}>
               <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              <span class="toggle-label">{r.enabled ? "Active" : "Paused"}</span>
+              <span class="toggle-label">{r.enabled ? "运行中" : "已暂停"}</span>
             </button>
-            <button class="icon-btn" title="Edit rule" on:click={() => editRule(r)}>✎</button>
-            <button class="icon-btn danger" title="Delete rule" on:click={() => remove(r)}>✕</button>
+            <button class="icon-btn" title="编辑规则" on:click={() => editRule(r)}>✎</button>
+            <button class="icon-btn danger" title="删除规则" on:click={() => remove(r)}>✕</button>
           </div>
         </div>
       {/each}
@@ -285,41 +292,41 @@
   <aside class="drawer" transition:fly={{ x: 480, duration: 220 }}>
     <header class="drawer-head">
       <div class="drawer-head-main">
-        <div class="drawer-eyebrow">{isEdit ? "Editing rule" : "New rule"}</div>
+        <div class="drawer-eyebrow">{isEdit ? "编辑规则" : "新建规则"}</div>
         <input
           type="text"
           class="drawer-name"
-          placeholder="Untitled rule"
+          placeholder="未命名规则"
           bind:value={editing.name}
         />
       </div>
-      <button class="icon-btn close" on:click={cancel} title="Close">✕</button>
+      <button class="icon-btn close" on:click={cancel} title="关闭">✕</button>
     </header>
 
     <div class="drawer-pair">
       <label class="pair-block">
-        <span class="pair-label">Master</span>
+        <span class="pair-label">主账户 (master)</span>
         <select class="pair-select" bind:value={editing.master_id}>
-          <option value="" disabled>Select master…</option>
+          <option value="" disabled>选择主账户…</option>
           {#each masterOptions(editing.master_id) as a}
-            <option value={a.id}>{a.label} ({a.platform}){a.role !== "Master" ? ` — ${a.role}` : ""}</option>
+            <option value={a.id}>{a.label} ({a.platform}){a.role !== "Master" ? ` — ${roleLabel(a.role)}` : ""}</option>
           {/each}
         </select>
       </label>
       <div class="pair-arrow">→</div>
       <label class="pair-block">
-        <span class="pair-label">Slave</span>
+        <span class="pair-label">从账户 (slave)</span>
         <select class="pair-select" bind:value={editing.slave_id}>
-          <option value="" disabled>Select slave…</option>
+          <option value="" disabled>选择从账户…</option>
           {#each slaveOptions(editing.slave_id) as a}
-            <option value={a.id}>{a.label} ({a.platform}){a.role === "Master" ? " — Master" : ""}</option>
+            <option value={a.id}>{a.label} ({a.platform}){a.role === "Master" ? " — 主账户 (master)" : ""}</option>
           {/each}
         </select>
       </label>
       <label class="pair-toggle" class:on={editing.enabled}>
         <input type="checkbox" bind:checked={editing.enabled} />
         <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        <span>{editing.enabled ? "Active" : "Paused"}</span>
+        <span>{editing.enabled ? "运行中" : "已暂停"}</span>
       </label>
     </div>
 
@@ -339,8 +346,8 @@
       <section class="vbody">
         {#if activeTab === "lot"}
           <header class="sec-head">
-            <h3 class="section-title">Lot sizing</h3>
-            <p class="section-sub">Choose how the slave's volume is derived from the master's.</p>
+            <h3 class="section-title">手数设置</h3>
+            <p class="section-sub">选择从账户手数如何由主账户派生。</p>
           </header>
 
           <div class="radio-grid">
@@ -359,217 +366,217 @@
           <div class="form-grid mt">
             <div class="field">
               <label class="f-label" for="lot-value">
-                {editing.lot_mode === "RiskPercent" ? "Risk per trade" : "Lot value"}
+                {editing.lot_mode === "RiskPercent" ? "每笔交易风险" : "手数值"}
               </label>
               <div class="input-suffix">
                 <input id="lot-value" type="number" step="0.01" min="0" bind:value={editing.lot_value} />
                 <span class="suffix">{editing.lot_mode === "RiskPercent" ? "%" : editing.lot_mode === "Fixed" ? "lots" : "×"}</span>
               </div>
               <p class="f-help">
-                {editing.lot_mode === "Fixed" ? "Always open exactly this many lots."
-                  : editing.lot_mode === "RiskPercent" ? "% of slave equity risked per trade."
-                  : "Scaling factor applied on top of the chosen mode."}
+                {editing.lot_mode === "Fixed" ? "始终精确开启这么多手。"
+                  : editing.lot_mode === "RiskPercent" ? "每笔交易动用从账户净值的百分比。"
+                  : "在所选模式之上应用的缩放系数。"}
               </p>
             </div>
             {#if editing.lot_mode === "RiskPercent"}
               <div class="field">
-                <label class="f-label" for="pip-value">Pip value per lot</label>
+                <label class="f-label" for="pip-value">每手点值</label>
                 <div class="input-suffix">
                   <input id="pip-value" type="number" step="0.01" min="0.01" bind:value={editing.pip_value_per_lot} />
                   <span class="suffix">$/pip</span>
                 </div>
-                <p class="f-help">Used to translate risk % into a lot size.</p>
+                <p class="f-help">用于将风险比例换算为手数。</p>
               </div>
             {/if}
             <div class="field">
-              <label class="f-label" for="min-lot">Minimum lot</label>
+              <label class="f-label" for="min-lot">最小手数</label>
               <div class="input-suffix">
                 <input id="min-lot" type="number" step="0.01" min="0" bind:value={editing.min_lot} />
                 <span class="suffix">lots</span>
               </div>
-              <p class="f-help">0 = no floor.</p>
+              <p class="f-help">0 = 不设下限。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="max-lot">Maximum lot</label>
+              <label class="f-label" for="max-lot">最大手数</label>
               <div class="input-suffix">
                 <input id="max-lot" type="number" step="0.01" min="0" bind:value={editing.max_lot} />
                 <span class="suffix">lots</span>
               </div>
-              <p class="f-help">0 = no cap.</p>
+              <p class="f-help">0 = 不设上限。</p>
             </div>
           </div>
 
           <label class="check-row mt">
             <input type="checkbox" bind:checked={editing.reverse} />
             <span class="check-text">
-              <strong>Reverse direction</strong>
-              <span class="muted">Mirror Buy ↔ Sell on the slave.</span>
+              <strong>反向 (reverse)</strong>
+              <span class="muted">在从账户上镜像 买入 ↔ 卖出。</span>
             </span>
           </label>
 
         {:else if activeTab === "filters"}
           <header class="sec-head">
-            <h3 class="section-title">Filters</h3>
-            <p class="section-sub">Decide which master trades reach the slave.</p>
+            <h3 class="section-title">筛选</h3>
+            <p class="section-sub">决定哪些主账户交易会复制到从账户。</p>
           </header>
 
           <div class="form-grid">
             <div class="field">
-              <label class="f-label" for="direction">Direction</label>
+              <label class="f-label" for="direction">方向</label>
               <select id="direction" bind:value={editing.direction}>
-                <option value="All">Both buy &amp; sell</option>
-                <option value="BuyOnly">Buy only</option>
-                <option value="SellOnly">Sell only</option>
+                <option value="All">买入和卖出均可</option>
+                <option value="BuyOnly">仅买入</option>
+                <option value="SellOnly">仅卖出</option>
               </select>
             </div>
             <div class="field">
-              <label class="f-label" for="comment">Comment filter</label>
-              <input id="comment" type="text" placeholder="e.g. Scalper#1" bind:value={editing.comment_filter} />
-              <p class="f-help">Case-insensitive substring match. Empty = no filter.</p>
+              <label class="f-label" for="comment">备注筛选</label>
+              <input id="comment" type="text" placeholder="例如 Scalper#1" bind:value={editing.comment_filter} />
+              <p class="f-help">不区分大小写的子串匹配。留空 = 不过滤。</p>
             </div>
           </div>
 
           <label class="check-row mt">
             <input type="checkbox" bind:checked={editing.close_on_master_close} />
             <span class="check-text">
-              <strong>Close on master close</strong>
-              <span class="muted">Mirror master closes and pending cancels onto the slave. Disable to let the slave manage its own exits.</span>
+              <strong>主账户平仓时同步平仓</strong>
+              <span class="muted">将主账户的平仓与挂单取消镜像到从账户。关闭后由从账户自行管理出场。</span>
             </span>
           </label>
 
-          <h4 class="sub-section">Symbol matching</h4>
+          <h4 class="sub-section">品种匹配</h4>
           <div class="form-grid">
             <div class="field full">
-              <label class="f-label" for="wl">Whitelist</label>
+              <label class="f-label" for="wl">白名单</label>
               <input id="wl" type="text" placeholder="EUR, XAU, GER40"
                 value={csvBind(editing.symbol_whitelist)}
                 on:input={(ev) => editing && (editing.symbol_whitelist = fromCsv(ev.currentTarget.value))} />
-              <p class="f-help">Comma-separated substrings. Empty = allow everything.</p>
+              <p class="f-help">逗号分隔的子串。留空 = 全部允许。</p>
             </div>
             <div class="field full">
-              <label class="f-label" for="bl">Blacklist</label>
+              <label class="f-label" for="bl">黑名单</label>
               <input id="bl" type="text" placeholder="USDJPY, BTC"
                 value={csvBind(editing.symbol_blacklist)}
                 on:input={(ev) => editing && (editing.symbol_blacklist = fromCsv(ev.currentTarget.value))} />
-              <p class="f-help">Trades matching any of these are skipped.</p>
+              <p class="f-help">匹配其中任意一项的交易将被跳过。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="strip-prefix">Master strip prefix</label>
-              <input id="strip-prefix" type="text" placeholder="(none)" bind:value={editing.master_strip_prefix} />
-              <p class="f-help">Removed from the master ticker first (case-insensitive).</p>
+              <label class="f-label" for="strip-prefix">主账户剥离前缀</label>
+              <input id="strip-prefix" type="text" placeholder="（无）" bind:value={editing.master_strip_prefix} />
+              <p class="f-help">先从主账户代码中移除（不区分大小写）。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="strip-suffix">Master strip suffix</label>
+              <label class="f-label" for="strip-suffix">主账户剥离后缀</label>
               <input id="strip-suffix" type="text" placeholder="m" bind:value={editing.master_strip_suffix} />
-              <p class="f-help">Removed from the master ticker first (case-insensitive).</p>
+              <p class="f-help">先从主账户代码中移除（不区分大小写）。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="prefix">Slave prefix</label>
-              <input id="prefix" type="text" placeholder="(none)" bind:value={editing.symbol_prefix} />
-              <p class="f-help">Prepended to the resulting slave ticker.</p>
+              <label class="f-label" for="prefix">从账户前缀</label>
+              <input id="prefix" type="text" placeholder="（无）" bind:value={editing.symbol_prefix} />
+              <p class="f-help">添加到最终从账户代码的前面。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="suffix">Slave suffix</label>
+              <label class="f-label" for="suffix">从账户后缀</label>
               <input id="suffix" type="text" placeholder=".r" bind:value={editing.symbol_suffix} />
-              <p class="f-help">Appended to the resulting slave ticker.</p>
+              <p class="f-help">追加到最终从账户代码的末尾。</p>
             </div>
           </div>
           <div class="hint-box">
             <span class="hint-icon">→</span>
             <span>
-              Master <code>{editing.master_strip_prefix || ""}EURUSD{editing.master_strip_suffix || ""}</code>
-              → slave
+              主账户 <code>{editing.master_strip_prefix || ""}EURUSD{editing.master_strip_suffix || ""}</code>
+              → 从账户
               <code>{editing.symbol_prefix || ""}EURUSD{editing.symbol_suffix || ""}</code>
-              (exact mappings below take precedence).
+              （下方精确映射优先）。
             </span>
           </div>
 
-          <h4 class="sub-section">Symbol overrides</h4>
-          <p class="section-sub">Exact master → slave mapping. Wins over prefix/suffix when the master symbol matches.</p>
+          <h4 class="sub-section">品种覆盖</h4>
+          <p class="section-sub">主账户 → 从账户的精确映射。当主账户品种匹配时优先于前缀/后缀。</p>
           {#if mapPairs.length === 0}
-            <p class="f-help" style="margin: 6px 0 10px;">No overrides. Add one if the slave broker uses a different ticker (e.g. <code>XAUUSD</code> → <code>GOLD.r</code>).</p>
+            <p class="f-help" style="margin: 6px 0 10px;">暂无覆盖。若从账户经纪商使用不同代码，可添加一条（例如 <code>XAUUSD</code> → <code>GOLD.r</code>）。</p>
           {:else}
             <div class="map-list">
               {#each mapPairs as pair, i (i)}
                 <div class="map-row">
-                  <input type="text" placeholder="MASTER (e.g. XAUUSD)"
+                  <input type="text" placeholder="主账户 (例如 XAUUSD)"
                     value={pair[0]}
                     on:input={(ev) => updateMapping(i, 0, ev.currentTarget.value)} />
                   <span class="map-arrow">→</span>
-                  <input type="text" placeholder="SLAVE (e.g. GOLD.r)"
+                  <input type="text" placeholder="从账户 (例如 GOLD.r)"
                     value={pair[1]}
                     on:input={(ev) => updateMapping(i, 1, ev.currentTarget.value)} />
-                  <button type="button" class="map-remove" title="Remove" on:click={() => removeMapping(i)}>✕</button>
+                  <button type="button" class="map-remove" title="移除" on:click={() => removeMapping(i)}>✕</button>
                 </div>
               {/each}
             </div>
           {/if}
-          <button type="button" class="map-add" on:click={addMapping}>+ Add mapping</button>
+          <button type="button" class="map-add" on:click={addMapping}>+ 添加映射</button>
 
         {:else if activeTab === "risk"}
           <header class="sec-head">
-            <h3 class="section-title">Risk caps</h3>
-            <p class="section-sub">Hard limits evaluated <strong>before</strong> dispatching to the slave.</p>
+            <h3 class="section-title">风险上限</h3>
+            <p class="section-sub">在派发到从账户<strong>之前</strong>评估的硬性限制。</p>
           </header>
 
           <div class="form-grid">
             <div class="field">
-              <label class="f-label" for="max-pos">Max open positions</label>
+              <label class="f-label" for="max-pos">最大持仓数</label>
               <div class="input-suffix">
                 <input id="max-pos" type="number" min="0" step="1" bind:value={editing.max_open_positions} />
-                <span class="suffix">pos</span>
+                <span class="suffix">个</span>
               </div>
-              <p class="f-help">0 = unlimited.</p>
+              <p class="f-help">0 = 不限。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="max-exp">Max total exposure</label>
+              <label class="f-label" for="max-exp">最大总敞口</label>
               <div class="input-suffix">
                 <input id="max-exp" type="number" min="0" step="0.01" bind:value={editing.max_exposure_lots} />
                 <span class="suffix">lots</span>
               </div>
-              <p class="f-help">Sum of open volume on the slave.</p>
+              <p class="f-help">从账户当前持仓手数之和。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="max-loss">Max daily loss</label>
+              <label class="f-label" for="max-loss">最大日亏损</label>
               <div class="input-suffix">
                 <input id="max-loss" type="number" min="0" step="1" bind:value={editing.max_daily_loss} />
-                <span class="suffix">ccy</span>
+                <span class="suffix">货币</span>
               </div>
-              <p class="f-help">Stops new copies past this. 0 = off.</p>
+              <p class="f-help">超过此值后停止新复制。0 = 关闭。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="max-age">Skip trades older than</label>
+              <label class="f-label" for="max-age">跳过早于以下时间的交易</label>
               <div class="input-suffix">
                 <input id="max-age" type="number" min="0" step="1" bind:value={editing.skip_older_than_secs} />
                 <span class="suffix">s</span>
               </div>
-              <p class="f-help">Avoid copying stale fills. 0 = off.</p>
+              <p class="f-help">避免复制过期成交。0 = 关闭。</p>
             </div>
           </div>
           <div class="hint-box">
             <span class="hint-icon">ℹ</span>
-            <span>Daily-loss aggregates closed trades since 00:00 UTC for the slave account.</span>
+            <span>日亏损统计从账户自 00:00 UTC 起的已平仓交易。</span>
           </div>
 
         {:else if activeTab === "orders"}
           <header class="sec-head">
-            <h3 class="section-title">Order shaping</h3>
-            <p class="section-sub">SL/TP behaviour, slippage tolerance, and copy delay.</p>
+            <h3 class="section-title">订单设置</h3>
+            <p class="section-sub">止损/止盈行为、滑点容忍度与复制延迟。</p>
           </header>
 
-          <h4 class="sub-section">Stop-loss</h4>
+          <h4 class="sub-section">止损</h4>
           <div class="form-grid">
             <div class="field">
-              <label class="f-label" for="sl-mode">Mode</label>
+              <label class="f-label" for="sl-mode">模式</label>
               <select id="sl-mode" bind:value={editing.sl_mode}>
-                <option value="Copy">Copy from master</option>
-                <option value="Ignore">Ignore (no SL)</option>
-                <option value="Fixed">Fixed distance</option>
+                <option value="Copy">复制主账户</option>
+                <option value="Ignore">忽略（无止损）</option>
+                <option value="Fixed">固定距离</option>
               </select>
             </div>
             {#if editing.sl_mode === "Fixed"}
               <div class="field">
-                <label class="f-label" for="sl-pips">SL distance</label>
+                <label class="f-label" for="sl-pips">止损距离</label>
                 <div class="input-suffix">
                   <input id="sl-pips" type="number" min="0" step="0.1" bind:value={editing.sl_pips} />
                   <span class="suffix">pips</span>
@@ -578,19 +585,19 @@
             {/if}
           </div>
 
-          <h4 class="sub-section">Take-profit</h4>
+          <h4 class="sub-section">止盈</h4>
           <div class="form-grid">
             <div class="field">
-              <label class="f-label" for="tp-mode">Mode</label>
+              <label class="f-label" for="tp-mode">模式</label>
               <select id="tp-mode" bind:value={editing.tp_mode}>
-                <option value="Copy">Copy from master</option>
-                <option value="Ignore">Ignore (no TP)</option>
-                <option value="Fixed">Fixed distance</option>
+                <option value="Copy">复制主账户</option>
+                <option value="Ignore">忽略（无止盈）</option>
+                <option value="Fixed">固定距离</option>
               </select>
             </div>
             {#if editing.tp_mode === "Fixed"}
               <div class="field">
-                <label class="f-label" for="tp-pips">TP distance</label>
+                <label class="f-label" for="tp-pips">止盈距离</label>
                 <div class="input-suffix">
                   <input id="tp-pips" type="number" min="0" step="0.1" bind:value={editing.tp_pips} />
                   <span class="suffix">pips</span>
@@ -599,32 +606,32 @@
             {/if}
           </div>
 
-          <h4 class="sub-section">Execution</h4>
+          <h4 class="sub-section">执行</h4>
           <div class="form-grid">
             <div class="field">
-              <label class="f-label" for="slip">Max slippage</label>
+              <label class="f-label" for="slip">最大滑点</label>
               <div class="input-suffix">
                 <input id="slip" type="number" min="0" step="1" bind:value={editing.max_slippage_pips} />
                 <span class="suffix">pips</span>
               </div>
             </div>
             <div class="field">
-              <label class="f-label" for="delay">Trade delay</label>
+              <label class="f-label" for="delay">交易延迟</label>
               <div class="input-suffix">
                 <input id="delay" type="number" min="0" step="50" bind:value={editing.trade_delay_ms} />
                 <span class="suffix">ms</span>
               </div>
-              <p class="f-help">Wait before dispatching to the slave.</p>
+              <p class="f-help">派发到从账户前等待的时间。</p>
             </div>
           </div>
 
-          <h4 class="sub-section">Quote-diff compensation</h4>
+          <h4 class="sub-section">报价偏差补偿</h4>
           <p class="f-help" style="margin: 0 0 10px;">
-            Shift SL/TP for specific symbols by a fixed pip offset, so the slave's
-            stop sits at the expected price even when the slave broker quotes drift.
+            按固定的点偏移调整特定品种的止损/止盈，即使从账户经纪商报价出现偏差，
+            止损也能落在预期价位。
           </p>
           {#if editing.quote_offsets.length === 0}
-            <p class="f-help" style="margin: 0 0 10px;">No offsets — add one to compensate a symbol.</p>
+            <p class="f-help" style="margin: 0 0 10px;">暂无偏移 — 添加一条以补偿某品种。</p>
           {:else}
             <div class="qo-list">
               {#each editing.quote_offsets as o, i}
@@ -632,8 +639,8 @@
                   <input type="text" class="qo-sym" placeholder="EURUSD"
                          value={o.symbol}
                          on:input={(e) => { editing.quote_offsets[i].symbol = e.currentTarget.value.toUpperCase(); editing.quote_offsets = editing.quote_offsets; }} />
-                  <input type="text" class="qo-feed" placeholder="any feed"
-                         title="Optional TV data feed (e.g. OANDA:, *PEPPERSTONE). Leave blank to match any feed — only relevant when the master is TradingView and you want different drift values per feed."
+                  <input type="text" class="qo-feed" placeholder="任意数据源"
+                         title="可选的数据源 (例如 OANDA:、*PEPPERSTONE)。留空则匹配任意数据源 — 仅当主账户为 TradingView 且希望对不同数据源使用不同偏差值时才有意义。"
                          value={o.feed ?? ""}
                          on:input={(e) => { editing.quote_offsets[i].feed = e.currentTarget.value.toUpperCase(); editing.quote_offsets = editing.quote_offsets; }} />
                   <div class="input-suffix qo-pips">
@@ -641,7 +648,7 @@
                            bind:value={editing.quote_offsets[i].pips} />
                     <span class="suffix">pips</span>
                   </div>
-                  <button type="button" class="icon-btn danger" title="Remove"
+                  <button type="button" class="icon-btn danger" title="移除"
                           on:click={() => editing.quote_offsets = editing.quote_offsets.filter((_, j) => j !== i)}>✕</button>
                 </div>
               {/each}
@@ -649,33 +656,33 @@
           {/if}
           <button type="button" class="ghost mt"
                   on:click={() => editing.quote_offsets = [...editing.quote_offsets, { symbol: "", pips: 0, feed: "" }]}>
-            + Add symbol offset
+            + 添加品种偏移
           </button>
 
         {:else if activeTab === "schedule"}
           <header class="sec-head">
-            <h3 class="section-title">Schedule</h3>
-            <p class="section-sub">Restrict copying to a daily time window (UTC).</p>
+            <h3 class="section-title">时段</h3>
+            <p class="section-sub">将复制限制在每日时段内 (UTC)。</p>
           </header>
 
           <label class="check-row">
             <input type="checkbox" bind:checked={editing.schedule.enabled} />
             <span class="check-text">
-              <strong>Enable schedule</strong>
-              <span class="muted">Outside this window, master trades are skipped.</span>
+              <strong>启用时段</strong>
+              <span class="muted">在此时段之外，主账户交易将被跳过。</span>
             </span>
           </label>
 
           <div class="form-grid mt" class:dim={!editing.schedule.enabled}>
             <div class="field">
-              <label class="f-label" for="start">Start time (UTC)</label>
+              <label class="f-label" for="start">开始时间 (UTC)</label>
               <input id="start" type="time"
                 value={minToHHMM(editing.schedule.start_min)}
                 on:input={(ev) => editing && (editing.schedule.start_min = hhmmToMin(ev.currentTarget.value))}
                 disabled={!editing.schedule.enabled} />
             </div>
             <div class="field">
-              <label class="f-label" for="end">End time (UTC)</label>
+              <label class="f-label" for="end">结束时间 (UTC)</label>
               <input id="end" type="time"
                 value={minToHHMM(editing.schedule.end_min)}
                 on:input={(ev) => editing && (editing.schedule.end_min = hhmmToMin(ev.currentTarget.value))}
@@ -686,45 +693,45 @@
           <label class="check-row mt">
             <input type="checkbox" bind:checked={editing.schedule.skip_weekends} />
             <span class="check-text">
-              <strong>Skip weekends</strong>
-              <span class="muted">No copy on Sat/Sun (UTC).</span>
+              <strong>跳过周末</strong>
+              <span class="muted">周六/周日 (UTC) 不复制。</span>
             </span>
           </label>
 
           <div class="hint-box">
             <span class="hint-icon">ℹ</span>
-            <span>If <em>End</em> is before <em>Start</em>, the window wraps overnight (e.g. 22:00 → 06:00).</span>
+            <span>如果<em>结束</em>早于<em>开始</em>，时段将跨夜 (例如 22:00 → 06:00)。</span>
           </div>
 
         {:else if activeTab === "advanced"}
           <header class="sec-head">
-            <h3 class="section-title">Advanced</h3>
-            <p class="section-sub">Position management features that need a live price feed.</p>
+            <h3 class="section-title">高级</h3>
+            <p class="section-sub">需要实时报价数据源的持仓管理功能。</p>
           </header>
 
           <div class="form-grid">
             <div class="field">
-              <label class="f-label" for="trail">Trailing stop</label>
+              <label class="f-label" for="trail">移动止损</label>
               <div class="input-suffix">
                 <input id="trail" type="number" min="0" step="0.1" bind:value={editing.trailing_pips} />
                 <span class="suffix">pips</span>
               </div>
-              <p class="f-help">0 = disabled.</p>
+              <p class="f-help">0 = 禁用。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="be">Break-even after</label>
+              <label class="f-label" for="be">保本触发点位</label>
               <div class="input-suffix">
                 <input id="be" type="number" min="0" step="0.1" bind:value={editing.breakeven_after_pips} />
                 <span class="suffix">pips</span>
               </div>
-              <p class="f-help">Move SL to entry once profit reaches this.</p>
+              <p class="f-help">当盈利达到该值时将止损移到开仓价。</p>
             </div>
           </div>
           <div class="hint-box warn">
             <span class="hint-icon">⚠</span>
             <span>
-              Trailing &amp; break-even are stored on the rule but <strong>not yet executed</strong> by the engine —
-              they require slave-side price ticks. To be wired up later.
+              移动止损与保本会保存在规则中，但引擎<strong>尚未执行</strong> —
+              它们需要从账户侧的报价。后续将实现。
             </span>
           </div>
         {/if}
@@ -738,9 +745,9 @@
         {/each}
       </div>
       <div class="foot-actions">
-        <button on:click={cancel}>Cancel</button>
+        <button on:click={cancel}>取消</button>
         <button class="primary" on:click={save} disabled={!editing.master_id || !editing.slave_id}>
-          {isEdit ? "Save changes" : "Create rule"}
+          {isEdit ? "保存更改" : "创建规则"}
         </button>
       </div>
     </footer>

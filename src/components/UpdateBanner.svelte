@@ -8,30 +8,30 @@
   <div class="banner checking" aria-live="polite">
     <span class="arrow spinning">↻</span>
     <span class="text">
-      <span class="line-1">Checking for updates…</span>
+      <span class="line-1">正在检查更新…</span>
     </span>
   </div>
 {:else if s.kind === "up-to-date"}
   <div class="banner ready">
     <span class="arrow">✓</span>
     <span class="text">
-      <span class="line-1">You're up to date</span>
-      <span class="line-2">Latest version installed</span>
+      <span class="line-1">已是最新版本</span>
+      <span class="line-2">已安装最新版本</span>
     </span>
   </div>
 {:else if s.kind === "available"}
-  <button class="banner" on:click={installUpdate} title={s.notes ?? `Install version ${s.version} and relaunch`}>
+  <button class="banner" on:click={installUpdate} title={s.notes ?? `安装版本 ${s.version} 并重启`}>
     <span class="arrow">↑</span>
     <span class="text">
-      <span class="line-1">Update available</span>
-      <span class="line-2">v{s.version} · click to install</span>
+      <span class="line-1">发现新版本</span>
+      <span class="line-2">v{s.version} · 点击安装</span>
     </span>
   </button>
 {:else if s.kind === "downloading"}
   <div class="banner downloading" aria-live="polite">
     <span class="arrow spinning">↻</span>
     <span class="text">
-      <span class="line-1">Downloading v{s.version}</span>
+      <span class="line-1">正在下载 v{s.version}</span>
       <span class="line-2">{pctStr}</span>
     </span>
     <div class="bar"><div class="bar-fill" style:width={pctStr || "0%"}></div></div>
@@ -40,16 +40,16 @@
   <div class="banner ready">
     <span class="arrow">✓</span>
     <span class="text">
-      <span class="line-1">Update installed</span>
-      <span class="line-2">Relaunching…</span>
+      <span class="line-1">更新已安装</span>
+      <span class="line-2">正在重启…</span>
     </span>
   </div>
 {:else if s.kind === "error"}
-  <button class="banner error" on:click={installUpdate} title="Retry">
+  <button class="banner error" on:click={installUpdate} title="重试">
     <span class="arrow">!</span>
     <span class="text">
-      <span class="line-1">Update failed</span>
-      <span class="line-2">Click to retry</span>
+      <span class="line-1">更新失败</span>
+      <span class="line-2">点击重试</span>
     </span>
   </button>
 {/if}
