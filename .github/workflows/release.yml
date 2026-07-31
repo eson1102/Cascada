@@ -295,4 +295,6 @@ jobs:
             Full install walk-through: see the [README](https://github.com/flocom/Cascada#running-an-unsigned-build).
           releaseDraft: false
           prerelease: false
+          # my-custom fork 分支无签名密钥，禁用 updater JSON 生成
+          includeUpdaterJson: false
           args: ${{ matrix.args }}
