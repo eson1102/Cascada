@@ -300,7 +300,6 @@ pub struct OrderRequest {
     pub tp: Option<f64>,
     pub max_slippage_pips: u32,
     /// Custom order comment generated from the rule (empty = none).
-    #[serde(default)]
     pub comment: String,
 }
 
@@ -317,7 +316,6 @@ pub struct PendingOrderRequest {
     /// UTC epoch ms; 0 = GTC.
     pub expiry: i64,
     /// Custom order comment generated from the rule (empty = none).
-    #[serde(default)]
     pub comment: String,
 }
 
