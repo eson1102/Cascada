@@ -140,6 +140,13 @@ pub struct CopyRule {
     #[serde(default)] pub max_open_positions: u32,  // 0 = unlimited
     #[serde(default)] pub max_exposure_lots: f64,   // 0 = unlimited
     #[serde(default)] pub max_daily_loss: f64,      // 0 = off; absolute value in account ccy
+    /// Maximum floating loss (unrealised P&L) on this rule's slave holdings.
+    /// 0 = off. When unrealised loss crosses this threshold (USD), every
+    /// slave position under the rule is closed automatically.
+    #[serde(default)] pub max_floating_loss: f64,
+    /// Friday 20:00 UTC weekend-close sweep. When true, the watchdog
+    /// closes all slave positions of this rule at UTC Friday 20:00.
+    #[serde(default)] pub weekend_close: bool,
 
     // Order shaping
     #[serde(default)] pub sl_mode: SlTpMode,

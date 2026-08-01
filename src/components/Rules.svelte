@@ -105,7 +105,7 @@
     const name = r.name?.trim() || "此规则";
     const ok = await ask(
       `删除“${name}”${pair}？\n\n此后信号端的新交易将不再通过此规则复制到该跟单端。现有持仓不受影响。`,
-      { title: "删除复制规则？", kind: "warning", okLabel: "删除", cancelLabel: "取消" });
+      { title: "删除跟单规则？", kind: "warning", okLabel: "删除", cancelLabel: "取消" });
     if (!ok) return;
     await api.deleteRule(r.id);
     dispatch("refresh");
@@ -209,6 +209,8 @@
     if (r.max_open_positions) out.push({ kind: "info", text: `≤ ${r.max_open_positions} 持仓` });
     if (r.max_exposure_lots)  out.push({ kind: "info", text: `≤ ${r.max_exposure_lots} 手` });
     if (r.max_daily_loss)     out.push({ kind: "danger", text: `−${r.max_daily_loss} 触发停止` });
+    if (r.max_floating_loss)  out.push({ kind: "danger", text: `浮亏限 ${r.max_floating_loss} USD` });
+    if (r.weekend_close)       out.push({ kind: "primary", text: "周五 20:00 UTC 清盘" });
     if (r.schedule.enabled)   out.push({ kind: "info", text: `${minToHHMM(r.schedule.start_min)}–${minToHHMM(r.schedule.end_min)}` });
     if (r.schedule.skip_weekends) out.push({ kind: "info", text: "仅工作日" });
     if (r.trade_delay_ms)     out.push({ kind: "info", text: `+${r.trade_delay_ms}ms` });
@@ -232,7 +234,7 @@
   $: issuesCount = ruleMeta.issues;
 
   const TABS: { id: TabId; label: string; icon: string; desc: string }[] = [
-    { id: "lot",      label: "手数设置",   icon: "⚖", desc: "跟单端手数的计算方式" },
+    { id: "lot",      label: "跟单端手数",   icon: "⚖", desc: "跟单端最终成交手数的计算方式" },
     { id: "filters",  label: "筛选",       icon: "⛃", desc: "复制哪些交易与品种" },
     { id: "risk",     label: "风险上限",   icon: "🛡", desc: "每个跟单端的安全限制" },
     { id: "orders",   label: "订单设置",   icon: "✎", desc: "止损/止盈、滑点、延迟" },
@@ -244,7 +246,7 @@
 <div class="card rules-root">
   <div class="card-header">
     <div class="header-left">
-      <h2>复制规则</h2>
+      <h2>跟单规则</h2>
       <span class="count-pill">{rules.length}</span>
     </div>
     <button class="primary btn-new" on:click={newDraft} disabled={!!editing}>
@@ -265,7 +267,7 @@
   {#if rules.length === 0}
     <div class="empty-state">
       <div class="empty-glyph">⇄</div>
-      <h3 class="empty-title">还没有复制规则</h3>
+      <h3 class="empty-title">还没有跟单规则</h3>
       <p class="empty-sub">
         在账户 (Accounts) 标签页中将一个账户标记为<b>信号端</b>、另一个标记为<b>跟单端</b>，
         然后在此创建规则以开始镜像交易。
@@ -413,7 +415,7 @@
       <section class="vbody">
         {#if activeTab === "lot"}
           <header class="sec-head">
-            <h3 class="section-title">手数设置</h3>
+            <h3 class="section-title">跟单端手数</h3>
             <p class="section-sub">选择跟单端手数如何由信号端派生。</p>
           </header>
 
@@ -504,7 +506,7 @@
           </div>
 
           <h4 class="sub-section">信号端手数过滤</h4>
-          <p class="section-sub">按信号端<strong>原始</strong>下单手数筛选要复制的订单，不满足直接跳过（区别于上方"手数设置"里的最小/最大手数限制）。</p>
+          <p class="section-sub">按只复制信号端<strong>原始</strong>下单手数落在区间的订单，不满足直接跳过（区别于上方"跟单端手数"对最终手数的最小/最大裁剪）。</p>
           <div class="form-grid">
             <div class="field">
               <label class="f-label" for="master-min-lot">信号端最小手数</label>
@@ -563,24 +565,24 @@
               <p class="f-help">匹配其中任意一项的交易将被跳过。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="strip-prefix">信号端剥离前缀</label>
+              <label class="f-label" for="strip-prefix">信号端去掉前缀</label>
               <input id="strip-prefix" type="text" placeholder="（无）" bind:value={editing.master_strip_prefix} />
               <p class="f-help">先从信号端代码中移除（不区分大小写）。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="strip-suffix">信号端剥离后缀</label>
+              <label class="f-label" for="strip-suffix">信号端去掉后缀</label>
               <input id="strip-suffix" type="text" placeholder="m" bind:value={editing.master_strip_suffix} />
               <p class="f-help">先从信号端代码中移除（不区分大小写）。</p>
             </div>
             <div class="field">
               <label class="f-label" for="prefix">跟单端前缀</label>
               <input id="prefix" type="text" placeholder="（无）" bind:value={editing.symbol_prefix} />
-              <p class="f-help">添加到最终跟单端代码的前面。</p>
+              <p class="f-help">加到跟单端品种前面。</p>
             </div>
             <div class="field">
               <label class="f-label" for="suffix">跟单端后缀</label>
               <input id="suffix" type="text" placeholder=".r" bind:value={editing.symbol_suffix} />
-              <p class="f-help">追加到最终跟单端代码的末尾。</p>
+              <p class="f-help">加到跟单端品种后面。</p>
             </div>
           </div>
           <div class="hint-box">
@@ -645,6 +647,14 @@
                 <span class="suffix">货币</span>
               </div>
               <p class="f-help">超过此值后停止新复制。0 = 关闭。</p>
+            </div>
+            <div class="field">
+              <label class="f-label" for="max-floating">最大浮亏（自动清仓）</label>
+              <div class="input-suffix">
+                <input id="max-floating" type="number" min="0" step="1" bind:value={editing.max_floating_loss} />
+                <span class="suffix">USD</span>
+              </div>
+              <p class="f-help">跟单端持仓的浮亏超过此值时，自动全部平仓。0 = 关闭。</p>
             </div>
             <div class="field">
               <label class="f-label" for="max-age">跳过早于以下时间的交易</label>
@@ -818,6 +828,14 @@
             <span class="check-text">
               <strong>跳过周末</strong>
               <span class="muted">周六/周日 (UTC) 不复制。</span>
+            </span>
+          </label>
+
+          <label class="check-row mt">
+            <input type="checkbox" bind:checked={editing.weekend_close} />
+            <span class="check-text">
+              <strong>周末清盘</strong>
+              <span class="muted">每周五 20:00 UTC 自动平掉该规则全部跟单持仓，避开周末跳空风险。</span>
             </span>
           </label>
 

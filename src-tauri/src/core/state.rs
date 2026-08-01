@@ -8,6 +8,7 @@ use crate::core::ticket_map::TicketMap;
 use crate::sidecar::TvProxyManager;
 use anyhow::Result;
 use dashmap::DashMap;
+use chrono::{Datelike, Timelike};
 use parking_lot::RwLock;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -37,6 +38,9 @@ pub struct AppState {
     /// front-end emission is throttled separately via `quote_last_emit`.
     pub quotes: DashMap<(String, String), Quote>,
     quote_last_emit: DashMap<(String, String), std::time::Instant>,
+    /// Tracks per-rule auto-close actions (e.g. weekend sweep) so the
+    /// watchdog doesn't fire repeatedly within the same calendar day.
+    pub last_close: DashMap<String, String>,
     /// Active per-account subscription set (uppercased symbols). Authoritative
     /// source replayed to the EA on reconnect.
     pub subscriptions: DashMap<String, Vec<String>>,
@@ -64,6 +68,7 @@ impl AppState {
             connectors: DashMap::new(),
             quotes: DashMap::new(),
             quote_last_emit: DashMap::new(),
+            last_close: DashMap::new(),
             subscriptions: DashMap::new(),
             symbols: DashMap::new(),
             ticket_map: Arc::new(TicketMap::new()),
@@ -503,6 +508,79 @@ impl AppState {
         }
         Ok(format!("已发出平仓 {} 笔、取消挂单 {} 笔（规则：{}）",
             closed, cancelled, rule.name))
+    }
+
+    /// Background sweep — every 5s. Enforces per-rule `max_floating_loss`
+    /// (closes the rule's slave positions when unrealised loss crosses the
+    /// USD threshold) and `weekend_close` (Friday 20:00 UTC sweep).
+    pub fn start_watchdog(self: &Arc<Self>) {
+        let s = self.clone();
+        tauri::async_runtime::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                s.tick_risk().await;
+            }
+        });
+    }
+
+    async fn tick_risk(self: &Arc<Self>) {
+        let rules = self.rules.read().clone();
+        for rule in rules {
+            if !rule.enabled { continue; }
+            // ---- 浮亏监控 ----
+            if rule.max_floating_loss > 0.0 {
+                if let Some(loss) = self.rule_floating_loss(&rule) {
+                    if loss >= rule.max_floating_loss {
+                        self.emit_log(LogLevel::Warn, &rule.master_id,
+                            format!("浮亏 ${:.2} 超过阈值 ${:.2}，自动清仓（规则：{}）",
+                                loss, rule.max_floating_loss, rule.name));
+                        let _ = self.close_rule_positions(&rule.id).await;
+                    }
+                }
+            }
+            // ---- 周末清盘：周五 20:00 UTC（5 分钟窗口）----
+            if rule.weekend_close {
+                let now = chrono::Utc::now();
+                if now.weekday() == chrono::Weekday::Fri
+                    && now.hour() == 20 && now.minute() < 5
+                {
+                    let today = now.format("%Y-%m-%d").to_string();
+                    let dup = self.last_close.get(&rule.id).map(|v| v.value().clone());
+                    if dup.as_deref() != Some(&today) {
+                        self.emit_log(LogLevel::Info, &rule.master_id,
+                            format!("周末清盘（周五 20:00 UTC）触发（规则：{}）", rule.name));
+                        let _ = self.close_rule_positions(&rule.id).await;
+                        self.last_close.insert(rule.id.clone(), today);
+                    }
+                }
+            }
+        }
+    }
+
+    /// 估算该规则下全部 slave 持仓的浮亏（USD）。用 EA 上报的 quote；
+    /// 外汇按 100000 单位标价，便于在不解析合约大小时给出保守估计。
+    fn rule_floating_loss(&self, rule: &CopyRule) -> Option<f64> {
+        let slaves = self.ticket_map.slaves_for_rule(&rule.id);
+        if slaves.is_empty() { return Some(0.0); }
+        let trades = self.trades.read();
+        let mut total = 0.0_f64;
+        for s in &slaves {
+            let t = trades.iter().find(|t| t.ticket == s.ticket
+                && t.account_id == s.account_id).cloned();
+            let Some(t) = t else { continue; };
+            let q = self.quotes.get(&(s.account_id.clone(), t.symbol.clone())).map(|v| v.value().clone());
+            let Some(q) = q else { continue; };
+            let units = (t.volume * 100000.0).max(0.0);
+            let is_buy = matches!(t.side, Side::Buy);
+            let current = if is_buy { q.bid } else { q.ask };
+            let loss = if is_buy {
+                (t.price - current) * units
+            } else {
+                (current - t.price) * units
+            };
+            if loss > 0.0 { total += loss; }
+        }
+        Some(total)
     }
 
     /// Look up an MT account by (platform, login) or create one on the fly.

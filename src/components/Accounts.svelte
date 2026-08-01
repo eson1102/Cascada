@@ -128,7 +128,7 @@
     const willIdle = slave && !rules.some((r) => r.slave_id === slave.id && r.id !== rule.id);
     const ok = await ask(
       `从 "${masterLbl}" 断开 "${slaveLbl}"？\n\n` +
-      `复制规则将被删除。` +
+      `跟单规则将被删除。` +
       (willIdle ? ` "${slaveLbl}" 将移回未分配。` : ""),
       { title: "断开跟单端？", kind: "warning", okLabel: "断开", cancelLabel: "取消" });
     if (!ok) return;
@@ -422,12 +422,12 @@
   }
   .row:first-child { border-top: none; }
   .row.master {
-    background: linear-gradient(180deg, var(--mc-tint, var(--surface-muted)) 0%, var(--surface) 100%);
+    background: var(--surface-muted);
     grid-template-columns: auto auto 1fr auto auto auto auto;
     border-top: none;
   }
   .row.slave {
-    background: color-mix(in srgb, var(--mc-tint, var(--primary-soft)) 35%, var(--surface));
+    background: color-mix(in srgb, var(--mc-tint, var(--primary-soft)) 12%, var(--surface));
     grid-template-columns: 20px auto auto 1fr auto auto auto auto;
     padding-left: 48px;
     cursor: grab;

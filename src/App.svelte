@@ -182,7 +182,7 @@
   const nav: { id: Tab; label: string; icon: string }[] = [
     { id: "dashboard", label: "仪表盘", icon: "M3 12l2-2 4 4 8-8 4 4" },
     { id: "accounts", label: "账户", icon: "M4 7h16M4 12h16M4 17h10" },
-    { id: "rules", label: "复制规则", icon: "M7 7h10M7 12h10M7 17h6" },
+    { id: "rules", label: "跟单规则", icon: "M7 7h10M7 12h10M7 17h6" },
     { id: "trades", label: "交易", icon: "M4 19V5M4 19h16M8 15V9M12 15V7M16 15v-4" },
     { id: "compare", label: "对比", icon: "M3 6h12M3 12h18M3 18h9" },
     { id: "logs", label: "日志", icon: "M5 5h14v14H5zM8 9h8M8 13h8M8 17h5" },

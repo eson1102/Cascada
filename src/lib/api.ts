@@ -72,6 +72,10 @@ export interface CopyRule {
   max_open_positions: number;
   max_exposure_lots: number;
   max_daily_loss: number;
+  /** 自动清仓阈值：浮亏超过此值（USD）时 watchdog 全部平仓。0 = 关闭。 */
+  max_floating_loss: number;
+  /** 周末清盘：周五 20:00 UTC 自动平掉该规则跟单端全部持仓。 */
+  weekend_close: boolean;
 
   sl_mode: SlTpMode;
   sl_pips: number;
@@ -158,6 +162,7 @@ export function defaultRule(master_id = "", slave_id = ""): CopyRule {
     comment_filter: "",
     close_on_master_close: true,
     max_open_positions: 0, max_exposure_lots: 0, max_daily_loss: 0,
+    max_floating_loss: 0, weekend_close: false,
     sl_mode: "Copy", sl_pips: 0,
     tp_mode: "Copy", tp_pips: 0,
     trade_delay_ms: 0, skip_older_than_secs: 0,

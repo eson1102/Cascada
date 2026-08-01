@@ -702,7 +702,7 @@
         <span class="live-pill"><span class="live-dot"></span> 实时</span>
       {/if}
     </div>
-    <p class="sub">实时买卖价并排对比。在一段时间内采集点数中位差，然后直接写入复制规则。</p>
+    <p class="sub">实时买卖价并排对比。在一段时间内采集点数中位差，然后直接写入跟单规则。</p>
   </header>
 
   {#if masters.length === 0 || slaves.length === 0}
@@ -922,7 +922,7 @@
                     </span>
                     {#if matchingRules.length === 0}
                       <button class="cap-apply"
-                              title="为此信号端 ↔ 跟单端组合创建新的复制规则，并预填已采集的偏移值"
+                              title="为此信号端 ↔ 跟单端组合创建新的跟单规则，并预填已采集的偏移值"
                               on:click={() => createRuleFromCapture(i)}>
                         + 创建规则
                       </button>

@@ -33,6 +33,7 @@ fn main() {
                     }
                     s.start_engine().await;
                     s.spawn_save_loop();
+                    s.start_watchdog();
                     s.reconnect_all();
                     s.spawn_ctrader_discovery();
                     s.spawn_mt_discovery();
