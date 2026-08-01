@@ -195,7 +195,7 @@
   }
   .tv-info strong { color: #1d4ed8; }
   .tv-info code {
-    background: #fff; padding: 1px 6px; border-radius: 4px;
+    background: var(--surface); padding: 1px 6px; border-radius: 4px;
     font-size: 11px;
   }
   .tv-info em { color: #1d4ed8; font-style: normal; font-weight: 600; }

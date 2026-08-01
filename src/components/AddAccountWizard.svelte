@@ -115,7 +115,7 @@
   .wizard {
     padding: 20px 22px 24px;
     border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, #fafbfc 0%, #ffffff 100%);
+    background: linear-gradient(180deg, var(--surface-muted) 0%, var(--surface) 100%);
     display: flex; flex-direction: column; gap: 18px;
   }
   .platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
@@ -123,7 +123,7 @@
     display: flex; flex-direction: column; gap: 4px;
     padding: 14px 16px;
     border: 1.5px solid var(--border); border-radius: 10px;
-    background: #fff; text-align: left; cursor: pointer;
+    background: var(--surface); text-align: left; cursor: pointer;
     transition: all 0.12s ease;
   }
   .plat-card:hover { border-color: #cbd5e1; transform: translateY(-1px); }
@@ -150,7 +150,7 @@
     display: flex; flex-direction: column; gap: 10px;
   }
   .lead { margin: 0; font-size: 13px; color: var(--text); }
-  .lead code { background: #fff; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  .lead code { background: var(--surface); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
   .install-row { display: flex; gap: 8px; flex-wrap: wrap; }
   .inst-status {
     font-size: 12px; padding: 8px 12px; border-radius: 6px;

@@ -485,18 +485,25 @@ namespace cAlgo.Robots
 
         private static string ExtractOrigin(string comment)
         {
-            if (comment == null || !comment.StartsWith("cascada:")) return "";
-            string s = comment.Substring(8);
+            // New short prefix "c:" first (saves 6 chars of label budget);
+            // legacy "cascada:" also accepted.
+            if (comment == null) return "";
+            int at = comment.IndexOf("cascada:", StringComparison.Ordinal);
+            int plen = 8;
+            if (at < 0) { at = comment.IndexOf("c:", StringComparison.Ordinal); plen = 2; }
+            if (at < 0) return "";
+            string s = comment.Substring(at + plen);
             int sp = s.IndexOf(' ');
             return sp >= 0 ? s.Substring(0, sp) : s;
         }
 
         // Origin marker + optional user comment, space-separated:
-        // "cascada:<ticket> <custom comment>". ExtractOrigin() reads only
-        // the ticket (up to the first space), so the custom comment is safe.
+        // "c:<ticket> <custom comment>". The marker is kept FIRST so ticket
+        // correlation survives platform label-length truncation; the custom
+        // text follows it. ExtractOrigin() reads the first token.
         private static string BuildComment(string origin, string custom)
         {
-            string cmt = "cascada:" + origin;
+            string cmt = "c:" + origin;
             if (!string.IsNullOrEmpty(custom)) cmt = cmt + " " + custom;
             return cmt;
         }
@@ -576,18 +583,35 @@ namespace cAlgo.Robots
         private static string JsonField(string s, string key)
         {
             var needle = "\"" + key + "\":";
-            int i = s.IndexOf(needle);
+            int i = s.IndexOf(needle, StringComparison.Ordinal);
             if (i < 0) return "";
             i += needle.Length;
-            while (i < s.Length && (s[i] == ' ' || s[i] == '"')) i++;
-            int end = i;
-            while (end < s.Length)
+            while (i < s.Length && s[i] == ' ') i++;
+            if (i >= s.Length) return "";
+            if (s[i] == '"')
             {
-                char c = s[end];
-                if (c == ',' || c == '}' || c == '"') break;
-                end++;
+                // Quoted string value: end at the closing quote. Commas inside
+                // the string are data, NOT field separators.
+                i++;
+                int end = i;
+                while (end < s.Length)
+                {
+                    char c = s[end];
+                    if (c == '"') break;
+                    if (c == '\\' && end + 1 < s.Length) { end += 2; continue; }
+                    end++;
+                }
+                return s.Substring(i, end - i);
             }
-            return s.Substring(i, end - i);
+            // Unquoted (number) value: end at the next field separator.
+            int end2 = i;
+            while (end2 < s.Length)
+            {
+                char c = s[end2];
+                if (c == ',' || c == '}') break;
+                end2++;
+            }
+            return s.Substring(i, end2 - i);
         }
     }
 }

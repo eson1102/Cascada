@@ -154,18 +154,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Apple Silicon only — the macos-13 (Intel) runner was dropped
-          # because GitHub's Intel runner pool is so constrained that the
-          # job routinely sat in queue for 24h before timing out and
-          # failing the entire release. Users on Intel Macs can still
-          # build from source; we'll restore the matrix entry once
-          # GitHub-hosted Intel availability stabilises.
-          - platform: macos-latest
-            args: '--target aarch64-apple-darwin'
-            python_target: 'aarch64-apple-darwin'
-          - platform: ubuntu-latest
-            args: ''
-            python_target: 'x86_64-unknown-linux-gnu'
+          # my-custom fork 只编译 Windows —— macOS / Linux 已注释（需时放开）
+          # - platform: macos-latest
+          #   args: '--target aarch64-apple-darwin'
+          #   python_target: 'aarch64-apple-darwin'
+          # - platform: ubuntu-latest
+          #   args: ''
+          #   python_target: 'x86_64-unknown-linux-gnu'
           - platform: windows-latest
             args: ''
             python_target: 'x86_64-pc-windows-msvc'

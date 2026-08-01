@@ -43,7 +43,7 @@
     box-sizing: border-box;
     align-items: center;
   }
-  .line:hover { background: #fafbfc; }
+  .line:hover { background: var(--surface-muted); }
   .ts { color: var(--text-muted); }
   .lvl { text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; font-weight: 600; display: inline-block; }
   .lvl.info { color: var(--primary); }

@@ -388,7 +388,7 @@
     border: 1px solid var(--border);
     border-left: 4px solid var(--mc-border, var(--border));
     border-radius: 12px;
-    background: #fff;
+    background: var(--surface);
     overflow: hidden;
     transition: box-shadow 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
   }
@@ -398,7 +398,7 @@
     transform: translateY(-1px);
   }
   .group.orphans {
-    background: #fafbfc;
+    background: var(--surface-muted);
     border-left: 4px solid #cbd5e1;
   }
   .group-header {
@@ -456,7 +456,7 @@
     padding: 4px 10px 4px 4px;
     border: 1px solid var(--border);
     border-radius: 999px;
-    background: #fff;
+    background: var(--surface);
     font-size: 12px; font-weight: 600;
     cursor: pointer;
   }
@@ -469,7 +469,7 @@
   .toggle-thumb {
     position: absolute; top: 2px; left: 2px;
     width: 12px; height: 12px;
-    background: #fff; border-radius: 50%;
+    background: var(--surface); border-radius: 50%;
     box-shadow: 0 1px 2px rgba(0,0,0,0.2);
     transition: left .15s ease;
   }
@@ -481,7 +481,7 @@
 
   .row.orphan {
     grid-template-columns: auto 1fr auto auto auto auto;
-    background: #fff;
+    background: var(--surface);
     cursor: grab;
   }
   .row.orphan:active { cursor: grabbing; }
@@ -512,7 +512,7 @@
   .label-edit {
     font: inherit; padding: 2px 6px;
     border: 1px solid var(--primary); border-radius: 4px;
-    background: #fff; width: 100%;
+    background: var(--surface); width: 100%;
   }
 
   .status-pill {
@@ -563,7 +563,7 @@
     display: inline-flex; align-items: center; gap: 6px;
     padding: 4px 10px;
     border: 1px solid var(--mc-border, var(--border)); border-radius: 6px;
-    background: #fff; font-size: 12px; font-weight: 500;
+    background: var(--surface); font-size: 12px; font-weight: 500;
     color: var(--mc-text, var(--text));
     cursor: pointer;
     transition: background 0.1s ease, transform 0.1s ease;

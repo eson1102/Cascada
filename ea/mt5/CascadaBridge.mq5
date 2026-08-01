@@ -949,22 +949,25 @@ string ReasonToString(ENUM_DEAL_REASON r)
 
 string ExtractOrigin(const string comment)
 {
-   if(StringLen(comment) >= 8 && StringFind(comment, "cascada:") == 0)
-   {
-      string s = StringSubstr(comment, 8);
-      int sp = StringFind(s, " ");
-      if(sp >= 0) s = StringSubstr(s, 0, sp);
-      return s;
-   }
-   return "";
+   // New short prefix "c:" first (saves 6 chars of comment budget);
+   // legacy "cascada:" also accepted.
+   int at = StringFind(comment, "cascada:");
+   int len = 8;
+   if(at < 0) { at = StringFind(comment, "c:"); len = 2; }
+   if(at < 0) return "";
+   string s = StringSubstr(comment, at + len);
+   int sp = StringFind(s, " ");
+   if(sp >= 0) s = StringSubstr(s, 0, sp);
+   return s;
 }
 
 // Origin marker + optional user comment, space-separated:
-// "cascada:<ticket> <custom comment>". ExtractOrigin() reads only the
-// ticket (up to the first space), so the custom comment is safe.
+// "c:<ticket> <custom comment>". The marker is kept FIRST so ticket
+// correlation survives platform comment-length truncation; the custom
+// text follows it. ExtractOrigin() reads the first token.
 string BuildComment(const string origin, const string custom)
 {
-   string cmt = "cascada:" + origin;
+   string cmt = "c:" + origin;
    if(StringLen(custom) > 0) cmt = cmt + " " + custom;
    return cmt;
 }
@@ -982,12 +985,32 @@ string JsonField(const string s, const string key)
    if(i < 0) return "";
    i += StringLen(needle);
    int len = StringLen(s);
-   while(i < len && (StringGetCharacter(s, i) == ' ' || StringGetCharacter(s, i) == '"')) i++;
+   // Skip whitespace, then the opening quote if this is a string value.
+   while(i < len && (StringGetCharacter(s, i) == ' ')) i++;
+   if(i >= len) return "";
+   if(StringGetCharacter(s, i) == '"')
+   {
+      // Quoted string value: end at the closing quote. Commas inside the
+      // string are data, NOT field separators — treating them as such
+      // truncated order comments containing "," / "，".
+      i++;
+      int end = i;
+      while(end < len)
+      {
+         ushort c = StringGetCharacter(s, end);
+         if(c == '"') break;
+         // skip escaped quote \" so it doesn't terminate early
+         if(c == '\\' && end + 1 < len) { end += 2; continue; }
+         end++;
+      }
+      return StringSubstr(s, i, end - i);
+   }
+   // Unquoted (number) value: end at the next field separator.
    int end = i;
    while(end < len)
    {
       ushort c = StringGetCharacter(s, end);
-      if(c == ',' || c == '}' || c == '"') break;
+      if(c == ',' || c == '}') break;
       end++;
    }
    return StringSubstr(s, i, end - i);

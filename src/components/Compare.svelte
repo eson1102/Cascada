@@ -1115,7 +1115,7 @@
     color: var(--text);
   }
   .tv-hint code {
-    background: #fff;
+    background: var(--surface);
     padding: 1px 5px;
     border-radius: 3px;
     font-size: 10.5px;
@@ -1125,7 +1125,7 @@
     margin-top: 8px;
     padding: 6px 10px;
     border-radius: 6px;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--border);
   }
   .feed-label {
@@ -1140,7 +1140,7 @@
     padding: 4px 8px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: #fff;
+    background: var(--surface);
     color: var(--text);
   }
   .feed-select:focus { outline: 1px solid var(--primary); }
@@ -1151,7 +1151,7 @@
     padding: 3px 5px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: #fff;
+    background: var(--surface);
     color: var(--text-2);
     max-width: 110px;
   }

@@ -232,16 +232,16 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
         检查更新
       </button>
+      <button class="theme-btn" title={dark ? "切换到明亮模式" : "切换到暗黑模式"}
+              on:click={toggleTheme}>
+        {#if dark}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        {:else}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        {/if}
+        {dark ? "明亮" : "暗黑"}
+      </button>
       <div class="settings-row">
-        <button class="settings-btn" title={dark ? "切换到明亮模式" : "切换到暗黑模式"}
-                on:click={toggleTheme}>
-          {#if dark}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-          {:else}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-          {/if}
-          {dark ? "明亮" : "暗黑"}
-        </button>
         <button class="settings-btn" title="将账户与规则导出为 JSON 文件"
                 disabled={busy !== ""} on:click={exportSettings}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
@@ -299,6 +299,15 @@
     box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
   }
   .ver { font-style: normal; font-weight: 500; font-size: 11px; color: var(--text-muted); }
+  .theme-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; padding: 6px 10px; margin-bottom: 6px;
+    font-size: 12px; font-weight: 500; color: var(--text-2);
+    background: transparent; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .theme-btn:hover { background: var(--surface-muted); color: var(--primary); border-color: var(--primary); }
   nav { display: flex; flex-direction: column; gap: 2px; }
   .nav-item {
     display: flex; align-items: center; gap: 10px;
