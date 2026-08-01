@@ -427,7 +427,7 @@
     border-top: none;
   }
   .row.slave {
-    background: color-mix(in srgb, var(--mc-tint, #fcfdff) 35%, #ffffff);
+    background: color-mix(in srgb, var(--mc-tint, var(--primary-soft)) 35%, var(--surface));
     grid-template-columns: 20px auto auto 1fr auto auto auto auto;
     padding-left: 48px;
     cursor: grab;
@@ -436,8 +436,8 @@
   .row.slave.off {
     background: repeating-linear-gradient(
       45deg,
-      #f1f5f9 0px, #f1f5f9 8px,
-      #e2e8f0 8px, #e2e8f0 9px
+      var(--surface-muted) 0px, var(--surface-muted) 8px,
+      var(--border) 8px, var(--border) 9px
     );
     filter: grayscale(1);
     opacity: 0.65;

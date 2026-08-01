@@ -8,7 +8,6 @@
   import Trades from "./components/Trades.svelte";
   import Compare from "./components/Compare.svelte";
   import Logs from "./components/Logs.svelte";
-  import Statistics from "./components/Statistics.svelte";
   import UpdateBanner from "./components/UpdateBanner.svelte";
   import { startUpdateWatcher, checkForUpdate, updateState } from "./lib/updater";
   import pkg from "../package.json";
@@ -27,7 +26,7 @@
     applyTheme();
   }
 
-  type Tab = "dashboard" | "accounts" | "rules" | "trades" | "compare" | "statistics" | "logs";
+  type Tab = "dashboard" | "accounts" | "rules" | "trades" | "compare" | "logs";
   let accounts: Account[] = [];
   let rules: CopyRule[] = [];
   let trades: Trade[] = [];
@@ -186,7 +185,6 @@
     { id: "rules", label: "复制规则", icon: "M7 7h10M7 12h10M7 17h6" },
     { id: "trades", label: "交易", icon: "M4 19V5M4 19h16M8 15V9M12 15V7M16 15v-4" },
     { id: "compare", label: "对比", icon: "M3 6h12M3 12h18M3 18h9" },
-    { id: "statistics", label: "统计", icon: "M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2zM8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" },
     { id: "logs", label: "日志", icon: "M5 5h14v14H5zM8 9h8M8 13h8M8 17h5" },
   ];
 </script>
@@ -277,8 +275,6 @@
         <Trades {trades} {accounts} />
       {:else if tab === "compare"}
         <Compare {accounts} {rules} on:refresh={refresh} />
-      {:else if tab === "statistics"}
-        <Statistics {trades} {rules} {accounts} />
       {:else if tab === "logs"}
         <Logs {logs} />
       {/if}

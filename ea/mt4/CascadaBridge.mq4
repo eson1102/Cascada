@@ -4,13 +4,17 @@
 //|   <TerminalCommonDataPath>/Files/Cascada/MT4/<login>/             |
 //| No DLL, no network, no whitelist.                                 |
 //+------------------------------------------------------------------+
-#property copyright "Cascada"
-#property version   "1.00"
+#property copyright "Qingshan Copier"
+#property version   "0.9.5"
+#property description "青山跟单 (Qingshan Copier) v0.9.5"
 #property strict
 
 input int HistoryDays  = 7;
 input int HistoryMax   = 500;
 input int PollMs       = 250;
+// 构建信息（编译时间由 MetaEditor 自动注入）
+input string InpBuildVer  = "v0.9.5";
+input string InpBuildTime = __DATETIME__;
 
 string g_dir;
 string g_evt_path;
@@ -350,6 +354,9 @@ void WriteOpen(bool resync = false)
    string sym  = OrderSymbol();
    string side = (OrderType() == OP_BUY) ? "Buy" : "Sell";
    string cmt  = OrderComment();
+   // Origin 优先取内存映射（自定义备注时 comment 无 c: 标记），回退到备注解析
+   string origin = OriginFor(OrderTicket());
+   if(StringLen(origin) == 0) origin = ExtractOrigin(cmt);
    string body =
       "\"ticket\":\""    + IntegerToString(OrderTicket()) + "\"" +
       ",\"magic\":"      + IntegerToString(OrderMagicNumber()) +
@@ -363,7 +370,7 @@ void WriteOpen(bool resync = false)
       ",\"swap\":"       + F5(OrderSwap()) +
       ",\"pip_size\":"   + F5(PipSize(sym)) +
       ",\"comment\":\""  + Esc(cmt) + "\"" +
-      ",\"origin\":\""   + Esc(ExtractOrigin(cmt)) + "\"" +
+      ",\"origin\":\""   + Esc(origin) + "\"" +
       ",\"resync\":"     + (resync ? "true" : "false") +
       ",\"ts\":"         + IntegerToString((long)OrderOpenTime() * 1000);
    WriteEvent("open", body);
@@ -562,6 +569,7 @@ void DoOpenMarket(const string line)
    int    pts   = (slip > 0 && point > 0) ? (int)MathRound(slip * PipSize(sym) / point) : 10;
    int r = OrderSend(sym, t, vol, price, pts, sl, tp, cmt, 0, 0, clrNONE);
    if(r < 0) WriteLog("error", "open failed " + sym + ": " + IntegerToString(GetLastError()));
+   else      RememberOrigin(r, origin);
 }
 
 void DoOpenPending(const string line, bool is_limit)
@@ -584,6 +592,7 @@ void DoOpenPending(const string line, bool is_limit)
    datetime exp = (expiry_ms > 0) ? (datetime)(expiry_ms / 1000) : (datetime)0;
    int r = OrderSend(sym, t, vol, tgt, 5, sl, tp, cmt, 0, exp, clrNONE);
    if(r < 0) WriteLog("error", "pending failed " + sym + ": " + IntegerToString(GetLastError()));
+   else      RememberOrigin(r, origin);
 }
 
 void DoClose(const string line)
@@ -787,11 +796,47 @@ string ExtractOrigin(const string comment)
 // "c:<ticket> <custom comment>". The marker is kept FIRST so ticket
 // correlation survives platform comment-length truncation; the custom
 // text follows it. ExtractOrigin() reads the first token.
+// Origin marker + optional user comment. When a custom comment is present
+// it is used AS-IS (no "c:" prefix — users asked for clean comments); the
+// origin correlation is then carried by the in-memory ticket map instead
+// (RememberOrigin/OriginFor). Without a custom comment the marker is
+// written so origin survives an EA restart / re-attach.
 string BuildComment(const string origin, const string custom)
 {
-   string cmt = "c:" + origin;
-   if(StringLen(custom) > 0) cmt = cmt + " " + custom;
-   return cmt;
+   if(StringLen(custom) > 0) return custom;
+   return "c:" + origin;
+}
+
+// ---- in-memory slave-ticket → master-ticket map ----
+// Lets open events report their origin even when the order comment is a
+// clean user comment (no "c:" marker). Lost on EA restart — that's why
+// no-custom comments still carry the marker as a fallback.
+struct OriginRec { int ticket; string origin; };
+OriginRec g_origins[];
+
+void RememberOrigin(int ticket, const string origin)
+{
+   if(ticket <= 0 || StringLen(origin) == 0) return;
+   for(int i = ArraySize(g_origins) - 1; i >= 0; i--)
+   {
+      if(g_origins[i].ticket == ticket)
+      {
+         if(g_origins[i].origin != origin) g_origins[i].origin = origin;
+         return;
+      }
+   }
+   if(ArraySize(g_origins) >= 500) ArrayRemove(g_origins, 0, 50); // 防无限增长
+   int n = ArraySize(g_origins);
+   ArrayResize(g_origins, n + 1);
+   g_origins[n].ticket = ticket;
+   g_origins[n].origin = origin;
+}
+
+string OriginFor(int ticket)
+{
+   for(int i = ArraySize(g_origins) - 1; i >= 0; i--)
+      if(g_origins[i].ticket == ticket) return g_origins[i].origin;
+   return "";
 }
 
 //+------------------------------------------------------------------+

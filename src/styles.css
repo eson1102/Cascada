@@ -79,7 +79,7 @@ button.primary:hover { background: var(--primary-hover); border-color: var(--pri
 button.ghost { background: transparent; border-color: transparent; color: var(--primary); }
 button.ghost:hover { background: var(--primary-soft); }
 button.danger { color: var(--danger); border-color: transparent; background: transparent; }
-button.danger:hover { background: #fef2f2; }
+button.danger:hover { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); }
 button.icon { padding: 6px 9px; }
 
 input, select {
@@ -128,7 +128,7 @@ tbody td {
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
-tbody tr:hover { background: #fafbfc; }
+tbody tr:hover { background: var(--surface-muted); }
 tbody tr:last-child td { border-bottom: none; }
 
 .chip {

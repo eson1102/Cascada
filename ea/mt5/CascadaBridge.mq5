@@ -4,8 +4,9 @@
 //|   <TerminalCommonDataPath>/Files/Cascada/MT5/<login>/             |
 //| No network, no whitelist — drop the EA on a chart and it works.   |
 //+------------------------------------------------------------------+
-#property copyright "Cascada"
-#property version   "1.01"
+#property copyright "Qingshan Copier"
+#property version   "0.9.5"
+#property description "青山跟单 (Qingshan Copier) v0.9.5"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -15,6 +16,9 @@
 input int HistoryDays  = 7;     // history snapshot window (days)
 input int HistoryMax   = 500;   // max trades emitted in the snapshot
 input int PollMs       = 200;   // command-file poll cadence (ms)
+// 构建信息（编译时间由 MetaEditor 自动注入）
+input string InpBuildVer  = "v0.9.5";
+input string InpBuildTime = __DATETIME__;
 
 string        g_dir;            // "Cascada\MT5\<login>"
 string        g_evt_path;
@@ -165,6 +169,12 @@ void OnTradeTransaction(const MqlTradeTransaction& trans,
          ulong position_id = (ulong)HistoryDealGetInteger(trans.deal, DEAL_POSITION_ID);
          if(entry == DEAL_ENTRY_IN || entry == DEAL_ENTRY_INOUT)
          {
+            // 挂单成交：把 origin 从挂单 ticket 迁移到 position ticket
+            if(trans.order != 0)
+            {
+               string o = OriginFor((ulong)trans.order);
+               if(StringLen(o) > 0) RememberOrigin(position_id, o);
+            }
             if(PositionSelectByTicket(position_id)) WriteOpen(position_id);
          }
          else if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_OUT_BY)
@@ -435,6 +445,9 @@ void WriteOpen(ulong ticket, bool resync = false)
    string sym  = PositionGetString(POSITION_SYMBOL);
    string side = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? "Buy" : "Sell";
    string cmt  = PositionGetString(POSITION_COMMENT);
+   // Origin 优先取内存映射（自定义备注时 comment 无 c: 标记），回退到备注解析
+   string origin = OriginFor(ticket);
+   if(StringLen(origin) == 0) origin = ExtractOrigin(cmt);
    long ts_ms  = (long)PositionGetInteger(POSITION_TIME_MSC);
    if(ts_ms == 0) ts_ms = (long)PositionGetInteger(POSITION_TIME) * 1000;
    string body =
@@ -452,7 +465,7 @@ void WriteOpen(ulong ticket, bool resync = false)
       ",\"swap\":"       + F5(PositionGetDouble(POSITION_SWAP)) +
       ",\"pip_size\":"   + F5(PipSize(sym)) +
       ",\"comment\":\""  + Esc(cmt) + "\"" +
-      ",\"origin\":\""   + Esc(ExtractOrigin(cmt)) + "\"" +
+      ",\"origin\":\""   + Esc(origin) + "\"" +
       ",\"resync\":"     + (resync ? "true" : "false") +
       ",\"ts\":"         + IntegerToString(ts_ms);
    WriteEvent("open", body);
@@ -517,6 +530,8 @@ void WritePending(const string ev, ulong ticket)
    ENUM_ORDER_TYPE ot = (ENUM_ORDER_TYPE)ord.OrderType();
    string side = IsBuyOrder(ot) ? "Buy" : "Sell";
    string cmt  = ord.Comment();
+   string porigin = OriginFor(ticket);
+   if(StringLen(porigin) == 0) porigin = ExtractOrigin(cmt);
    long expiry_s = (long)ord.TimeExpiration();
    string body =
       "\"ticket\":\""    + IntegerToString((long)ticket) + "\"" +
@@ -531,13 +546,12 @@ void WritePending(const string ev, ulong ticket)
       ",\"tp\":"         + F5(ord.TakeProfit()) +
       ",\"expiry\":"     + IntegerToString(expiry_s * 1000) +
       ",\"comment\":\""  + Esc(cmt) + "\"" +
-      ",\"origin\":\""   + Esc(ExtractOrigin(cmt)) + "\"" +
+      ",\"origin\":\""   + Esc(porigin) + "\"" +
       ",\"ts\":"         + IntegerToString(NowMs());
    WriteEvent(ev, body);
 }
 
-void WritePendingEnd(const string ev, ulong ticket)
-{
+void WritePendingEnd(const string ev, ulong ticket){
    string sym = "";
    if(HistoryOrderSelect(ticket)) sym = HistoryOrderGetString(ticket, ORDER_SYMBOL);
    string body =
@@ -732,6 +746,8 @@ void DoOpenMarket(const string line)
    if(!trade.PositionOpen(sym, t, vol, price, sl, tp, cmt))
       WriteLog("error", "open failed " + sym + ": " + IntegerToString(trade.ResultRetcode())
                + " " + trade.ResultComment());
+   else
+      RememberOrigin((ulong)trade.ResultOrder(), origin);
 }
 
 void DoOpenPending(const string line, bool is_limit)
@@ -763,6 +779,8 @@ void DoOpenPending(const string line, bool is_limit)
                     : trade.BuyStop  (vol, tgt, sym, sl, tp, tt, expiry_dt, cmt);
    if(!ok) WriteLog("error", "pending failed " + sym + ": "
                     + IntegerToString(trade.ResultRetcode()) + " " + trade.ResultComment());
+   else
+      RememberOrigin((ulong)trade.ResultOrder(), origin);
 }
 
 void DoClose(const string line)
@@ -1034,15 +1052,47 @@ string ExtractOrigin(const string comment)
    return s;
 }
 
-// Origin marker + optional user comment, space-separated:
-// "c:<ticket> <custom comment>". The marker is kept FIRST so ticket
-// correlation survives platform comment-length truncation; the custom
-// text follows it. ExtractOrigin() reads the first token.
+// Origin marker + optional user comment. When a custom comment is present
+// it is used AS-IS (no "c:" prefix — users asked for clean comments); the
+// origin correlation is then carried by the in-memory ticket map instead
+// (RememberOrigin/OriginFor). Without a custom comment the marker is
+// written so origin survives an EA restart / re-attach.
 string BuildComment(const string origin, const string custom)
 {
-   string cmt = "c:" + origin;
-   if(StringLen(custom) > 0) cmt = cmt + " " + custom;
-   return cmt;
+   if(StringLen(custom) > 0) return custom;
+   return "c:" + origin;
+}
+
+// ---- in-memory slave-ticket → master-ticket map ----
+// Lets open events report their origin even when the order comment is a
+// clean user comment (no "c:" marker). Lost on EA restart — that's why
+// no-custom comments still carry the marker as a fallback.
+struct OriginRec { ulong ticket; string origin; };
+OriginRec g_origins[];
+
+void RememberOrigin(ulong ticket, const string origin)
+{
+   if(ticket == 0 || StringLen(origin) == 0) return;
+   for(int i = ArraySize(g_origins) - 1; i >= 0; i--)
+   {
+      if(g_origins[i].ticket == ticket)
+      {
+         if(g_origins[i].origin != origin) g_origins[i].origin = origin;
+         return;
+      }
+   }
+   if(ArraySize(g_origins) >= 500) ArrayRemove(g_origins, 0, 50); // 防无限增长
+   int n = ArraySize(g_origins);
+   ArrayResize(g_origins, n + 1);
+   g_origins[n].ticket = ticket;
+   g_origins[n].origin = origin;
+}
+
+string OriginFor(ulong ticket)
+{
+   for(int i = ArraySize(g_origins) - 1; i >= 0; i--)
+      if(g_origins[i].ticket == ticket) return g_origins[i].origin;
+   return "";
 }
 
 string F2(double d) { return DoubleToString(d, 2); }

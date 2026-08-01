@@ -504,7 +504,7 @@
           </div>
 
           <h4 class="sub-section">信号端手数过滤</h4>
-          <p class="section-sub">按信号端<strong>原始</strong>下单手数筛选要复制的订单，不满足直接跳过（区别于上方"手数设置"里的最小/最大手数钳制）。</p>
+          <p class="section-sub">按信号端<strong>原始</strong>下单手数筛选要复制的订单，不满足直接跳过（区别于上方"手数设置"里的最小/最大手数限制）。</p>
           <div class="form-grid">
             <div class="field">
               <label class="f-label" for="master-min-lot">信号端最小手数</label>
@@ -618,7 +618,7 @@
         {:else if activeTab === "risk"}
           <header class="sec-head">
             <h3 class="section-title">风险上限</h3>
-            <p class="section-sub">在派发到跟单端<strong>之前</strong>评估的硬性限制。</p>
+            <p class="section-sub">下单前执行的硬性限制，超出即跳过。</p>
           </header>
 
           <div class="form-grid">
@@ -1077,19 +1077,19 @@
   }
   .edit-btn:hover { background: var(--primary-soft); }
 
-  /* 清仓：与补单同款胶囊，警示（橙）主题 */
+  /* 清仓：与补单同款胶囊，但用实心橙色填充 — 与红色描边的补单明显区分 */
   .close-btn {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 4px 10px;
-    border: 1px solid var(--warning);
+    border: 1px solid #f59e0b;
     border-radius: 999px;
-    background: transparent;
+    background: #f59e0b;
     font-size: 12px; font-weight: 600;
-    color: #b45309;
+    color: #7c2d12;
     cursor: pointer;
-    transition: background 0.12s ease;
+    transition: background 0.12s ease, border-color 0.12s ease;
   }
-  .close-btn:hover { background: rgba(245, 158, 11, 0.12); }
+  .close-btn:hover { background: #fbbf24; border-color: #fbbf24; }
   .close-btn.busy, .close-btn:disabled { opacity: 0.6; cursor: progress; }
   .close-dot {
     width: 8px; height: 8px; border-radius: 50%;
