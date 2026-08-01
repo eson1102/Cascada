@@ -20,6 +20,26 @@
   --radius-lg: 12px;
 }
 
+/* 暗黑模式 — 由 App.svelte 在 <html> 上切换 data-theme="dark" */
+:root[data-theme="dark"] {
+  --bg: #0e1116;
+  --surface: #161b22;
+  --surface-muted: #1c232d;
+  --border: #2a3340;
+  --border-strong: #3b4656;
+  --text: #e6e9ef;
+  --text-2: #a9b2c0;
+  --text-muted: #6d7887;
+  --primary: #4f8ef7;
+  --primary-hover: #6fa4f9;
+  --primary-soft: #1d2c4d;
+  --success: #34d399;
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
 * { box-sizing: border-box; }
 
 html, body {

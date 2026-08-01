@@ -93,6 +93,11 @@ impl CopyEngine {
                 comment: build_order_comment(&rule, t),
             };
 
+            if !req.comment.is_empty() {
+                self.state.emit_log(LogLevel::Info, &rule.slave_id,
+                    format!("order comment for {}: '{}'", t.ticket, req.comment));
+            }
+
             self.state.ticket_map.mark_pending(
                 &rule.slave_id, &t.ticket,
                 MasterKey { account_id: t.account_id.clone(), ticket: t.ticket.clone() },
@@ -168,13 +173,10 @@ impl CopyEngine {
         if rule.master_max_lot > 0.0 && t.volume > rule.master_max_lot {
             return Err("master lot above max");
         }
-        // Signal-side magic-number filter (MT4/MT5). Both bounds 0 = off;
-        // a single bound acts as >= / <=; min == max = exact match.
-        if rule.master_magic_min != 0 && t.magic < rule.master_magic_min {
-            return Err("master magic below min");
-        }
-        if rule.master_magic_max != 0 && t.magic > rule.master_magic_max {
-            return Err("master magic above max");
+        // Signal-side magic-number filter (MT4/MT5). Only trades whose magic
+        // is in the configured list are copied; empty list = filter off.
+        if !rule.master_magic_list.is_empty() && !rule.master_magic_list.contains(&t.magic) {
+            return Err("master magic mismatch");
         }
         // Skip stale trades
         if rule.skip_older_than_secs > 0 {

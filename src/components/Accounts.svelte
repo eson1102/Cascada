@@ -66,8 +66,8 @@
       const masterLbl = master.label || master.login;
       const ok = await ask(
         `将 "${slaveLbl}" 移到 "${masterLbl}" 名下？\n\n` +
-        `${stale.length} 条连接该从账户与其原主账户的现有规则将被删除。`,
-        { title: "重新分配从账户？", kind: "warning", okLabel: "移动并删除", cancelLabel: "取消" });
+        `${stale.length} 条连接该跟单端与其原信号端的现有规则将被删除。`,
+        { title: "重新分配跟单端？", kind: "warning", okLabel: "移动并删除", cancelLabel: "取消" });
       if (!ok) return;
       for (const r of stale) await api.deleteRule(r.id);
     }
@@ -123,14 +123,14 @@
   async function unlinkSlave(rule: CopyRule) {
     const master = accountMap.get(rule.master_id);
     const slave = accountMap.get(rule.slave_id);
-    const masterLbl = master ? (master.label || master.login) : "主账户";
-    const slaveLbl  = slave  ? (slave.label  || slave.login)  : "从账户";
+    const masterLbl = master ? (master.label || master.login) : "信号端";
+    const slaveLbl  = slave  ? (slave.label  || slave.login)  : "跟单端";
     const willIdle = slave && !rules.some((r) => r.slave_id === slave.id && r.id !== rule.id);
     const ok = await ask(
       `从 "${masterLbl}" 断开 "${slaveLbl}"？\n\n` +
       `复制规则将被删除。` +
       (willIdle ? ` "${slaveLbl}" 将移回未分配。` : ""),
-      { title: "断开从账户？", kind: "warning", okLabel: "断开", cancelLabel: "取消" });
+      { title: "断开跟单端？", kind: "warning", okLabel: "断开", cancelLabel: "取消" });
     if (!ok) return;
     await api.deleteRule(rule.id);
     if (willIdle && slave) await api.setRole(slave.id, "Idle");
@@ -229,7 +229,7 @@
              on:drop={(e) => onDrop(e, m)}
              role="region">
           <div class="row master">
-            <span class="role-badge master-badge">主账户</span>
+            <span class="role-badge master-badge">信号端</span>
             <span class="chip platform {m.platform}">{m.platform}</span>
             <div class="label-col">
               {#if editingId === m.id}
@@ -269,7 +269,7 @@
                    on:dragstart={(e) => onDragStart(e, slave.id)}
                    on:dragend={onDragEnd}>
                 <span class="tree-mark">↳</span>
-                <span class="role-badge slave-badge">从账户</span>
+                <span class="role-badge slave-badge">跟单端</span>
                 <span class="chip platform {slave.platform}">{slave.platform}</span>
                 <div class="label-col">
                   {#if editingId === slave.id}
@@ -296,16 +296,16 @@
                     <span class="toggle-track"><span class="toggle-thumb"></span></span>
                     <span class="toggle-label">{rule.enabled ? "运行中" : "已暂停"}</span>
                   </button>
-                  <button class="ghost icon" title="从主账户断开" on:click={() => unlinkSlave(rule)}>✕</button>
+                  <button class="ghost icon" title="从信号端断开" on:click={() => unlinkSlave(rule)}>✕</button>
                 </div>
               </div>
             {/each}
 
             {#if cands.length > 0}
               <div class="link-zone">
-                <span class="muted small">附加为从账户 →</span>
+                <span class="muted small">附加为跟单端 →</span>
                 {#each cands as c}
-                  <button class="candidate" title="将 {c.label} 关联为从账户" on:click={() => linkSlave(m, c)}>
+                  <button class="candidate" title="将 {c.label} 关联为跟单端" on:click={() => linkSlave(m, c)}>
                     + <span class="chip platform {c.platform}">{c.platform}</span>
                     <span>{c.label}</span>
                   </button>
@@ -327,7 +327,7 @@
              role="region">
           <div class="group-header">
             <span class="group-title">未分配</span>
-            <span class="muted small">{dragId ? '拖到这里可从主账户分离。' : '拖到某个主账户上，点击"设为主账户"，或选择一个主账户进行关联。'}</span>
+            <span class="muted small">{dragId ? '拖到这里可从信号端分离。' : '拖到某个信号端上，点击"设为信号端"，或选择一个信号端进行关联。'}</span>
           </div>
           {#each unassigned as a (a.id)}
             <div class="row orphan"
@@ -363,11 +363,11 @@
                   </button>
                 {/if}
                 {#each masters as m}
-                  <button class="candidate" title="附加为 {m.label} 的从账户" on:click={() => linkSlave(m, a)}>
+                  <button class="candidate" title="附加为 {m.label} 的跟单端" on:click={() => linkSlave(m, a)}>
                     → {m.label}
                   </button>
                 {/each}
-                <button class="primary" on:click={() => promote(a)}>设为主账户</button>
+                <button class="primary" on:click={() => promote(a)}>设为信号端</button>
                 <button class="danger icon" title="删除" on:click={() => removeAccount(a)}>✕</button>
               </div>
             </div>

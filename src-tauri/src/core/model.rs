@@ -107,10 +107,8 @@ pub struct CopyRule {
 
     // Signal-side (master) magic-number filter (MT4/MT5 only — cTrader and
     // TradingView orders carry no magic and report 0). The trade is skipped
-    // unless its magic falls inside [master_magic_min, master_magic_max].
-    // Both 0 = filter off; min == max = exact match.
-    #[serde(default)] pub master_magic_min: i64, // 0 = off
-    #[serde(default)] pub master_magic_max: i64, // 0 = off
+    // unless its magic appears in this list; empty = filter off.
+    #[serde(default)] pub master_magic_list: Vec<i64>,
 
     // Order comment shaping — appended to the slave order's comment/label.
     // `order_comment` is a free-text template; when `order_comment_src_lot`

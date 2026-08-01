@@ -50,10 +50,8 @@ export interface CopyRule {
   master_max_lot: number;
 
   /** Signal-side (master) magic-number filter (MT4/MT5 only). Trade is
-   *  skipped unless its magic falls inside [min, max]; both 0 = off,
-   *  min === max = exact match. */
-  master_magic_min: number;
-  master_magic_max: number;
+   *  skipped unless its magic appears in this list; empty = filter off. */
+  master_magic_list: number[];
 
   /** Custom comment written onto slave orders. `order_comment_src_lot`
    *  appends a `[SRC <lots>]` marker with the master's original volume. */
@@ -144,14 +142,14 @@ export function defaultRule(master_id = "", slave_id = ""): CopyRule {
     id: crypto.randomUUID(),
     name: "",
     master_id, slave_id,
-    enabled: true,
+    enabled: false,  // 默认不开启跟单，由用户手动启用
     lot_mode: "Multiplier", lot_value: 1,
     reverse: false,
     max_slippage_pips: 3,
     symbol_map: {},
     min_lot: 0, max_lot: 0,
     master_min_lot: 0, master_max_lot: 0,
-    master_magic_min: 0, master_magic_max: 0,
+    master_magic_list: [],
     order_comment: "", order_comment_src_lot: false,
     symbol_whitelist: [], symbol_blacklist: [],
     symbol_prefix: "", symbol_suffix: "",

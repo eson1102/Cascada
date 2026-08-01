@@ -708,14 +708,14 @@
   {#if masters.length === 0 || slaves.length === 0}
     <div class="empty">
       <div class="empty-icon">⇄</div>
-      <p>至少需要一个<strong>主账户 (master)</strong>和一个<strong>从账户 (slave)</strong>才能对比报价。</p>
+      <p>至少需要一个<strong>信号端</strong>和一个<strong>跟单端</strong>才能对比报价。</p>
     </div>
   {:else}
     <div class="picker">
       <!-- Master card -->
       <div class="acct-card master">
         <div class="acct-head">
-          <span class="lbl-tag">主账户 (master)</span>
+          <span class="lbl-tag">信号端</span>
           <span class="live-state" class:on={isLive(masterId)} title={isLive(masterId) ? "接收报价中" : "暂无最新报价"}>
             <span class="live-dot"></span>
           </span>
@@ -777,7 +777,7 @@
       <!-- Slave card -->
       <div class="acct-card slave">
         <div class="acct-head">
-          <span class="lbl-tag slave-tag">从账户 (slave)</span>
+          <span class="lbl-tag slave-tag">跟单端</span>
           <span class="live-state" class:on={isLive(slaveId)} title={isLive(slaveId) ? "接收报价中" : "暂无最新报价"}>
             <span class="live-dot"></span>
           </span>
@@ -813,9 +813,9 @@
       <table>
         <thead>
           <tr>
-            <th class="grp grp-m" colspan="4">主账户 (master)</th>
+            <th class="grp grp-m" colspan="4">信号端</th>
             <th class="grp grp-d">Δ</th>
-            <th class="grp grp-s" colspan="4">从账户 (slave)</th>
+            <th class="grp grp-s" colspan="4">跟单端</th>
             <th class="grp grp-c">采集</th>
             <th class="grp"></th>
           </tr>
@@ -879,7 +879,7 @@
                 {/if}
               </td>
               <td class="sym scell">
-                <input class="sym-input" type="text" list="dl-slave" placeholder="（与主账户相同）"
+                <input class="sym-input" type="text" list="dl-slave" placeholder="（与信号端相同）"
                        autocomplete="off" autocorrect="off" spellcheck="false"
                        bind:value={p.slave}
                        on:change={applySubscription} />
@@ -922,7 +922,7 @@
                     </span>
                     {#if matchingRules.length === 0}
                       <button class="cap-apply"
-                              title="为此主账户 ↔ 从账户组合创建新的复制规则，并预填已采集的偏移值"
+                              title="为此信号端 ↔ 跟单端组合创建新的复制规则，并预填已采集的偏移值"
                               on:click={() => createRuleFromCapture(i)}>
                         + 创建规则
                       </button>
@@ -991,7 +991,7 @@
         {/if}
       </div>
       <p class="hint">
-        Δ =（从账户中间价 − 主账户中间价）/ 点 · 正值表示从账户报价高于主账户。
+        Δ =（跟单端中间价 − 信号端中间价）/ 点 · 正值表示跟单端报价高于信号端。
       </p>
     </div>
   {/if}

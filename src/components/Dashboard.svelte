@@ -54,7 +54,7 @@
   </div>
   {#if recentTrades.length === 0}
     <div class="empty">
-      <p>暂无交易。连接主账户后，交易动态将在此实时显示。</p>
+      <p>暂无交易。连接信号端后，交易动态将在此实时显示。</p>
     </div>
   {:else}
     <table>

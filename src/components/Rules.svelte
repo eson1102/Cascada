@@ -34,8 +34,8 @@
   }
 
   function roleLabel(role: string): string {
-    if (role === "Master") return "主账户 (master)";
-    if (role === "Slave") return "从账户 (slave)";
+    if (role === "Master") return "信号端";
+    if (role === "Slave") return "跟单端";
     if (role === "Idle") return "空闲 (idle)";
     return role;
   }
@@ -43,10 +43,10 @@
   function ruleIssue(r: CopyRule): string | null {
     const m = idx.get(r.master_id);
     const s = idx.get(r.slave_id);
-    if (!m) return "缺少主账户 (master)";
-    if (!s) return "缺少从账户 (slave)";
-    if (m.role !== "Master") return `主账户现在是 ${m.role}`;
-    if (s.role !== "Slave") return `从账户现在是 ${s.role}`;
+    if (!m) return "缺少信号端";
+    if (!s) return "缺少跟单端";
+    if (m.role !== "Master") return `信号端现在是 ${m.role}`;
+    if (s.role !== "Slave") return `跟单端现在是 ${s.role}`;
     return null;
   }
 
@@ -104,7 +104,7 @@
     const pair = m && s ? ` (${labelOf(idx, r.master_id)} → ${labelOf(idx, r.slave_id)})` : "";
     const name = r.name?.trim() || "此规则";
     const ok = await ask(
-      `删除“${name}”${pair}？\n\n此后主账户的新交易将不再通过此规则复制到该从账户。现有持仓不受影响。`,
+      `删除“${name}”${pair}？\n\n此后信号端的新交易将不再通过此规则复制到该跟单端。现有持仓不受影响。`,
       { title: "删除复制规则？", kind: "warning", okLabel: "删除", cancelLabel: "取消" });
     if (!ok) return;
     await api.deleteRule(r.id);
@@ -125,7 +125,7 @@
   }
 
   const LOT_MODES: { id: LotMode; label: string; hint: string; icon: string }[] = [
-    { id: "Multiplier",   label: "倍数",           hint: "从账户 = 主账户 × 值",              icon: "✕" },
+    { id: "Multiplier",   label: "倍数",           hint: "跟单端 = 信号端 × 值",              icon: "✕" },
     { id: "Fixed",        label: "固定手数",       hint: "始终开 `value` 手",                 icon: "▣" },
     { id: "Equity",       label: "净值比例",       hint: "按净值比例 × 值缩放",               icon: "≈" },
     { id: "BalanceRatio", label: "余额比例",       hint: "按余额比例 × 值缩放",               icon: "⚖" },
@@ -152,8 +152,8 @@
     if (r.max_lot)             out.push({ kind: "info", text: `最大 ${r.max_lot} 手` });
     if (r.master_min_lot)      out.push({ kind: "info", text: `信号端 ≥ ${r.master_min_lot} 手` });
     if (r.master_max_lot)      out.push({ kind: "info", text: `信号端 ≤ ${r.master_max_lot} 手` });
-    if (r.master_magic_min || r.master_magic_max)
-      out.push({ kind: "info", text: `魔术号 ${r.master_magic_min || "0"}–${r.master_magic_max || "∞"}` });
+    if (r.master_magic_list?.length)
+      out.push({ kind: "info", text: `魔术号 ${r.master_magic_list.join(", ")}` });
     if (r.order_comment?.trim()) out.push({ kind: "primary", text: `备注 ${r.order_comment.trim()}` });
     if (r.order_comment_src_lot) out.push({ kind: "primary", text: "备注含信号端手数" });
     const offN = r.quote_offsets?.length ?? 0;
@@ -186,9 +186,9 @@
   $: issuesCount = ruleMeta.issues;
 
   const TABS: { id: TabId; label: string; icon: string; desc: string }[] = [
-    { id: "lot",      label: "手数设置",   icon: "⚖", desc: "从账户手数的计算方式" },
+    { id: "lot",      label: "手数设置",   icon: "⚖", desc: "跟单端手数的计算方式" },
     { id: "filters",  label: "筛选",       icon: "⛃", desc: "复制哪些交易与品种" },
-    { id: "risk",     label: "风险上限",   icon: "🛡", desc: "每个从账户的安全限制" },
+    { id: "risk",     label: "风险上限",   icon: "🛡", desc: "每个跟单端的安全限制" },
     { id: "orders",   label: "订单设置",   icon: "✎", desc: "止损/止盈、滑点、延迟" },
     { id: "schedule", label: "时段",       icon: "⏱", desc: "每日交易时段" },
     { id: "advanced", label: "高级",       icon: "⚙", desc: "移动止损与保本" },
@@ -211,7 +211,7 @@
       <span class="banner-icon">⚠</span>
       <div class="banner-body">
         <div class="banner-title">{issuesCount} 条规则需要您处理</div>
-        <div class="banner-sub">规则引用的主账户或从账户已不再匹配规则要求的角色。请在下方重新指派或删除受影响的规则。</div>
+        <div class="banner-sub">规则引用的信号端或跟单端已不再匹配规则要求的角色。请在下方重新指派或删除受影响的规则。</div>
       </div>
     </div>
   {/if}
@@ -221,7 +221,7 @@
       <div class="empty-glyph">⇄</div>
       <h3 class="empty-title">还没有复制规则</h3>
       <p class="empty-sub">
-        在账户 (Accounts) 标签页中将一个账户标记为<b>主账户 (master)</b>、另一个标记为<b>从账户 (slave)</b>，
+        在账户 (Accounts) 标签页中将一个账户标记为<b>信号端</b>、另一个标记为<b>跟单端</b>，
         然后在此创建规则以开始镜像交易。
       </p>
       <button class="primary" on:click={newDraft}>+ 创建第一条规则</button>
@@ -247,7 +247,7 @@
 
             <div class="rule-flow">
               <div class="acc-block">
-                <span class="role-tag master">主账户 (master)</span>
+                <span class="role-tag master">信号端</span>
                 <div class="acc-line">
                   <span class="chip platform {platformOf(idx, r.master_id)}">{platformOf(idx, r.master_id)}</span>
                   <span class="acc-label">{labelOf(idx, r.master_id)}</span>
@@ -260,7 +260,7 @@
               </div>
 
               <div class="acc-block">
-                <span class="role-tag slave">从账户 (slave)</span>
+                <span class="role-tag slave">跟单端</span>
                 <div class="acc-line">
                   <span class="chip platform {platformOf(idx, r.slave_id)}">{platformOf(idx, r.slave_id)}</span>
                   <span class="acc-label">{labelOf(idx, r.slave_id)}</span>
@@ -311,9 +311,9 @@
 
     <div class="drawer-pair">
       <label class="pair-block">
-        <span class="pair-label">主账户 (master)</span>
+        <span class="pair-label">信号端</span>
         <select class="pair-select" bind:value={editing.master_id}>
-          <option value="" disabled>选择主账户…</option>
+          <option value="" disabled>选择信号端…</option>
           {#each masterOptions(editing.master_id) as a}
             <option value={a.id}>{a.label} ({a.platform}){a.role !== "Master" ? ` — ${roleLabel(a.role)}` : ""}</option>
           {/each}
@@ -321,11 +321,11 @@
       </label>
       <div class="pair-arrow">→</div>
       <label class="pair-block">
-        <span class="pair-label">从账户 (slave)</span>
+        <span class="pair-label">跟单端</span>
         <select class="pair-select" bind:value={editing.slave_id}>
-          <option value="" disabled>选择从账户…</option>
+          <option value="" disabled>选择跟单端…</option>
           {#each slaveOptions(editing.slave_id) as a}
-            <option value={a.id}>{a.label} ({a.platform}){a.role === "Master" ? " — 主账户 (master)" : ""}</option>
+            <option value={a.id}>{a.label} ({a.platform}){a.role === "Master" ? " — 信号端" : ""}</option>
           {/each}
         </select>
       </label>
@@ -353,7 +353,7 @@
         {#if activeTab === "lot"}
           <header class="sec-head">
             <h3 class="section-title">手数设置</h3>
-            <p class="section-sub">选择从账户手数如何由主账户派生。</p>
+            <p class="section-sub">选择跟单端手数如何由信号端派生。</p>
           </header>
 
           <div class="radio-grid">
@@ -380,7 +380,7 @@
               </div>
               <p class="f-help">
                 {editing.lot_mode === "Fixed" ? "始终精确开启这么多手。"
-                  : editing.lot_mode === "RiskPercent" ? "每笔交易动用从账户净值的百分比。"
+                  : editing.lot_mode === "RiskPercent" ? "每笔交易动用跟单端净值的百分比。"
                   : "在所选模式之上应用的缩放系数。"}
               </p>
             </div>
@@ -416,14 +416,14 @@
             <input type="checkbox" bind:checked={editing.reverse} />
             <span class="check-text">
               <strong>反向 (reverse)</strong>
-              <span class="muted">在从账户上镜像 买入 ↔ 卖出。</span>
+              <span class="muted">在跟单端上镜像 买入 ↔ 卖出。</span>
             </span>
           </label>
 
         {:else if activeTab === "filters"}
           <header class="sec-head">
             <h3 class="section-title">筛选</h3>
-            <p class="section-sub">决定哪些主账户交易会复制到从账户。</p>
+            <p class="section-sub">决定哪些信号端交易会复制到跟单端。</p>
           </header>
 
           <div class="form-grid">
@@ -436,14 +436,14 @@
               </select>
             </div>
             <div class="field">
-              <label class="f-label" for="comment">备注筛选</label>
+              <label class="f-label" for="comment">信号端备注筛选</label>
               <input id="comment" type="text" placeholder="例如 Scalper#1" bind:value={editing.comment_filter} />
-              <p class="f-help">不区分大小写的子串匹配。留空 = 不过滤。</p>
+              <p class="f-help">按信号端订单自带的备注过滤，不区分大小写子串匹配。留空 = 不过滤。（注意：这与"订单设置"里写入跟单订单的备注不同）</p>
             </div>
           </div>
 
           <h4 class="sub-section">信号端手数过滤</h4>
-          <p class="section-sub">按主账户<strong>原始</strong>下单手数筛选要复制的订单，不满足直接跳过（区别于上方"手数设置"里的最小/最大手数钳制）。</p>
+          <p class="section-sub">按信号端<strong>原始</strong>下单手数筛选要复制的订单，不满足直接跳过（区别于上方"手数设置"里的最小/最大手数钳制）。</p>
           <div class="form-grid">
             <div class="field">
               <label class="f-label" for="master-min-lot">信号端最小手数</label>
@@ -464,39 +464,24 @@
           </div>
           <div class="hint-box">
             <span class="hint-icon">ℹ</span>
-            <span>例如 0.03 与 0.5 时，仅复制 0.03 &lt; 手数 &lt; 0.5 的主账户订单。</span>
+            <span>例如 0.03 与 0.5 时，仅复制 0.03 &lt; 手数 &lt; 0.5 的信号端订单。</span>
           </div>
 
           <h4 class="sub-section">魔术号过滤</h4>
-          <p class="section-sub">按主账户订单的 MT4/MT5 魔术号 (Magic Number) 筛选，只复制匹配的订单。cTrader / TradingView 账户无魔术号概念。</p>
-          <div class="form-grid">
-            <div class="field">
-              <label class="f-label" for="magic-min">魔术号下限</label>
-              <div class="input-suffix">
-                <input id="magic-min" type="number" min="0" step="1" bind:value={editing.master_magic_min} />
-                <span class="suffix">magic</span>
-              </div>
-              <p class="f-help">只复制魔术号 ≥ 此值的订单。0 = 不设下限。</p>
-            </div>
-            <div class="field">
-              <label class="f-label" for="magic-max">魔术号上限</label>
-              <div class="input-suffix">
-                <input id="magic-max" type="number" min="0" step="1" bind:value={editing.master_magic_max} />
-                <span class="suffix">magic</span>
-              </div>
-              <p class="f-help">只复制魔术号 ≤ 此值的订单。0 = 不设上限。</p>
-            </div>
-          </div>
-          <div class="hint-box">
-            <span class="hint-icon">ℹ</span>
-            <span>上下限相同即精确匹配。两个都为 0 = 不过滤。适用于按 EA 区分信号来源。</span>
+          <p class="section-sub">只复制信号端订单魔术号 (Magic Number) 与列表匹配的交易。cTrader / TradingView 账户无魔术号概念。</p>
+          <div class="field full">
+            <label class="f-label" for="magic-list">魔术号</label>
+            <input id="magic-list" type="text" placeholder="例如 12345, 67890"
+              value={editing.master_magic_list.join(", ")}
+              on:input={(ev) => editing && (editing.master_magic_list = ev.currentTarget.value.split(/[,，\s]+/).map((s) => s.trim()).filter((s) => s !== "" && !isNaN(Number(s))).map(Number))} />
+            <p class="f-help">逗号分隔的精确魔术号，匹配任意一个即复制。留空 = 不过滤。适用于按 EA 区分信号来源。</p>
           </div>
 
           <label class="check-row mt">
             <input type="checkbox" bind:checked={editing.close_on_master_close} />
             <span class="check-text">
-              <strong>主账户平仓时同步平仓</strong>
-              <span class="muted">将主账户的平仓与挂单取消镜像到从账户。关闭后由从账户自行管理出场。</span>
+              <strong>信号端平仓时同步平仓</strong>
+              <span class="muted">将信号端的平仓与挂单取消镜像到跟单端。关闭后由跟单端自行管理出场。</span>
             </span>
           </label>
 
@@ -517,49 +502,49 @@
               <p class="f-help">匹配其中任意一项的交易将被跳过。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="strip-prefix">主账户剥离前缀</label>
+              <label class="f-label" for="strip-prefix">信号端剥离前缀</label>
               <input id="strip-prefix" type="text" placeholder="（无）" bind:value={editing.master_strip_prefix} />
-              <p class="f-help">先从主账户代码中移除（不区分大小写）。</p>
+              <p class="f-help">先从信号端代码中移除（不区分大小写）。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="strip-suffix">主账户剥离后缀</label>
+              <label class="f-label" for="strip-suffix">信号端剥离后缀</label>
               <input id="strip-suffix" type="text" placeholder="m" bind:value={editing.master_strip_suffix} />
-              <p class="f-help">先从主账户代码中移除（不区分大小写）。</p>
+              <p class="f-help">先从信号端代码中移除（不区分大小写）。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="prefix">从账户前缀</label>
+              <label class="f-label" for="prefix">跟单端前缀</label>
               <input id="prefix" type="text" placeholder="（无）" bind:value={editing.symbol_prefix} />
-              <p class="f-help">添加到最终从账户代码的前面。</p>
+              <p class="f-help">添加到最终跟单端代码的前面。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="suffix">从账户后缀</label>
+              <label class="f-label" for="suffix">跟单端后缀</label>
               <input id="suffix" type="text" placeholder=".r" bind:value={editing.symbol_suffix} />
-              <p class="f-help">追加到最终从账户代码的末尾。</p>
+              <p class="f-help">追加到最终跟单端代码的末尾。</p>
             </div>
           </div>
           <div class="hint-box">
             <span class="hint-icon">→</span>
             <span>
-              主账户 <code>{editing.master_strip_prefix || ""}EURUSD{editing.master_strip_suffix || ""}</code>
-              → 从账户
+              信号端 <code>{editing.master_strip_prefix || ""}EURUSD{editing.master_strip_suffix || ""}</code>
+              → 跟单端
               <code>{editing.symbol_prefix || ""}EURUSD{editing.symbol_suffix || ""}</code>
               （下方精确映射优先）。
             </span>
           </div>
 
           <h4 class="sub-section">品种覆盖</h4>
-          <p class="section-sub">主账户 → 从账户的精确映射。当主账户品种匹配时优先于前缀/后缀。</p>
+          <p class="section-sub">信号端 → 跟单端的精确映射。当信号端品种匹配时优先于前缀/后缀。</p>
           {#if mapPairs.length === 0}
-            <p class="f-help" style="margin: 6px 0 10px;">暂无覆盖。若从账户经纪商使用不同代码，可添加一条（例如 <code>XAUUSD</code> → <code>GOLD.r</code>）。</p>
+            <p class="f-help" style="margin: 6px 0 10px;">暂无覆盖。若跟单端经纪商使用不同代码，可添加一条（例如 <code>XAUUSD</code> → <code>GOLD.r</code>）。</p>
           {:else}
             <div class="map-list">
               {#each mapPairs as pair, i (i)}
                 <div class="map-row">
-                  <input type="text" placeholder="主账户 (例如 XAUUSD)"
+                  <input type="text" placeholder="信号端 (例如 XAUUSD)"
                     value={pair[0]}
                     on:input={(ev) => updateMapping(i, 0, ev.currentTarget.value)} />
                   <span class="map-arrow">→</span>
-                  <input type="text" placeholder="从账户 (例如 GOLD.r)"
+                  <input type="text" placeholder="跟单端 (例如 GOLD.r)"
                     value={pair[1]}
                     on:input={(ev) => updateMapping(i, 1, ev.currentTarget.value)} />
                   <button type="button" class="map-remove" title="移除" on:click={() => removeMapping(i)}>✕</button>
@@ -572,7 +557,7 @@
         {:else if activeTab === "risk"}
           <header class="sec-head">
             <h3 class="section-title">风险上限</h3>
-            <p class="section-sub">在派发到从账户<strong>之前</strong>评估的硬性限制。</p>
+            <p class="section-sub">在派发到跟单端<strong>之前</strong>评估的硬性限制。</p>
           </header>
 
           <div class="form-grid">
@@ -590,7 +575,7 @@
                 <input id="max-exp" type="number" min="0" step="0.01" bind:value={editing.max_exposure_lots} />
                 <span class="suffix">lots</span>
               </div>
-              <p class="f-help">从账户当前持仓手数之和。</p>
+              <p class="f-help">跟单端当前持仓手数之和。</p>
             </div>
             <div class="field">
               <label class="f-label" for="max-loss">最大日亏损</label>
@@ -611,13 +596,13 @@
           </div>
           <div class="hint-box">
             <span class="hint-icon">ℹ</span>
-            <span>日亏损统计从账户自 00:00 UTC 起的已平仓交易。</span>
+            <span>日亏损统计跟单端自 00:00 UTC 起的已平仓交易。</span>
           </div>
 
         {:else if activeTab === "orders"}
           <header class="sec-head">
             <h3 class="section-title">订单设置</h3>
-            <p class="section-sub">止损/止盈行为、滑点容忍度与复制延迟。</p>
+            <p class="section-sub">止损/止盈、滑点限制与跟单延迟。</p>
           </header>
 
           <h4 class="sub-section">止损</h4>
@@ -625,7 +610,7 @@
             <div class="field">
               <label class="f-label" for="sl-mode">模式</label>
               <select id="sl-mode" bind:value={editing.sl_mode}>
-                <option value="Copy">复制主账户</option>
+                <option value="Copy">复制信号端</option>
                 <option value="Ignore">忽略（无止损）</option>
                 <option value="Fixed">固定距离</option>
               </select>
@@ -646,7 +631,7 @@
             <div class="field">
               <label class="f-label" for="tp-mode">模式</label>
               <select id="tp-mode" bind:value={editing.tp_mode}>
-                <option value="Copy">复制主账户</option>
+                <option value="Copy">复制信号端</option>
                 <option value="Ignore">忽略（无止盈）</option>
                 <option value="Fixed">固定距离</option>
               </select>
@@ -672,18 +657,18 @@
               </div>
             </div>
             <div class="field">
-              <label class="f-label" for="delay">交易延迟</label>
+              <label class="f-label" for="delay">跟单延迟</label>
               <div class="input-suffix">
                 <input id="delay" type="number" min="0" step="50" bind:value={editing.trade_delay_ms} />
                 <span class="suffix">ms</span>
               </div>
-              <p class="f-help">派发到从账户前等待的时间。</p>
+              <p class="f-help">下单前等待的时间（可错开跟单时机）。</p>
             </div>
           </div>
 
           <h4 class="sub-section">订单备注</h4>
           <p class="f-help" style="margin: 0 0 10px;">
-            写入从账户订单的自定义备注（MT4/MT5 的 Comment、cTrader 的 Label）。留空 = 不加备注。
+            写入跟单端订单的自定义备注（MT4/MT5 的 Comment、cTrader 的 Label）。留空 = 不加备注。
           </p>
           <div class="form-grid">
             <div class="field full">
@@ -698,13 +683,13 @@
             <input type="checkbox" bind:checked={editing.order_comment_src_lot} />
             <span class="check-text">
               <strong>备注包含信号端手数标记</strong>
-              <span class="muted">在备注末尾附加 <code>[SRC x.xx]</code>（主账户原始手数）。</span>
+              <span class="muted">在备注末尾附加 <code>[SRC x.xx]</code>（信号端原始手数）。</span>
             </span>
           </label>
 
           <h4 class="sub-section">报价偏差补偿</h4>
           <p class="f-help" style="margin: 0 0 10px;">
-            按固定的点偏移调整特定品种的止损/止盈，即使从账户经纪商报价出现偏差，
+            按固定的点偏移调整特定品种的止损/止盈，即使跟单端经纪商报价出现偏差，
             止损也能落在预期价位。
           </p>
           {#if editing.quote_offsets.length === 0}
@@ -717,7 +702,7 @@
                          value={o.symbol}
                          on:input={(e) => { editing.quote_offsets[i].symbol = e.currentTarget.value.toUpperCase(); editing.quote_offsets = editing.quote_offsets; }} />
                   <input type="text" class="qo-feed" placeholder="任意数据源"
-                         title="可选的数据源 (例如 OANDA:、*PEPPERSTONE)。留空则匹配任意数据源 — 仅当主账户为 TradingView 且希望对不同数据源使用不同偏差值时才有意义。"
+                         title="可选的数据源 (例如 OANDA:、*PEPPERSTONE)。留空则匹配任意数据源 — 仅当信号端为 TradingView 且希望对不同数据源使用不同偏差值时才有意义。"
                          value={o.feed ?? ""}
                          on:input={(e) => { editing.quote_offsets[i].feed = e.currentTarget.value.toUpperCase(); editing.quote_offsets = editing.quote_offsets; }} />
                   <div class="input-suffix qo-pips">
@@ -746,7 +731,7 @@
             <input type="checkbox" bind:checked={editing.schedule.enabled} />
             <span class="check-text">
               <strong>启用时段</strong>
-              <span class="muted">在此时段之外，主账户交易将被跳过。</span>
+              <span class="muted">在此时段之外，信号端交易将被跳过。</span>
             </span>
           </label>
 
@@ -808,7 +793,7 @@
             <span class="hint-icon">⚠</span>
             <span>
               移动止损与保本会保存在规则中，但引擎<strong>尚未执行</strong> —
-              它们需要从账户侧的报价。后续将实现。
+              它们需要跟单端侧的报价。后续将实现。
             </span>
           </div>
         {/if}

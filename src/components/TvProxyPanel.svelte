@@ -40,7 +40,7 @@
     installStatus = { kind: "info", text: "正在隔离浏览器窗口中启动 TradingView…" };
     try {
       tvStatus = await api.tvProxyOpenBrowser();
-      installStatus = { kind: "ok", text: "TradingView 已打开。随便下一笔小单 — 你的主账户会自动出现在这里。" };
+      installStatus = { kind: "ok", text: "TradingView 已打开。随便下一笔小单 — 你的信号端会自动出现在这里。" };
     } catch (e) {
       installStatus = { kind: "err", text: `${e}` };
     } finally { tvBusy = "idle"; }
@@ -84,12 +84,12 @@
   <strong>模拟盘功能有限。</strong> 在边界情况下（部分平仓、即时成交的挂单、净额合并、
   中间的止损/止盈帧），TV 的模拟账户表现与真实经纪商不同。<em>请先使用小额交易</em>
   做端到端功能测试，确认无误后再依赖它。若发现任何异常，建议以 <code>cTrader</code>
-  或 <code>MT4</code>/<code>MT5</code> 作为主账户 — 这些经过实战检验，桥接语义稳定。
+  或 <code>MT4</code>/<code>MT5</code> 作为信号端 — 这些经过实战检验，桥接语义稳定。
 </div>
 <div class="tv-info">
   <strong>净额 → 对冲映射。</strong> TV 模拟盘会把同一品种的所有开仓合并为一个净额持仓；
-  从账户经纪商（MT4/MT5/cTrader）会把每一笔开仓视为<em>独立</em>持仓。
-  在 TV 中连续两次各买入 1 BTC，会在从账户上产生两个独立的 1 BTC 持仓。
+  跟单端经纪商（MT4/MT5/cTrader）会把每一笔开仓视为<em>独立</em>持仓。
+  在 TV 中连续两次各买入 1 BTC，会在跟单端上产生两个独立的 1 BTC 持仓。
   止损/止盈的改动会作用于所有持仓；在 TV 中平仓会全部平掉。
 </div>
 <div class="tv-status">
@@ -160,7 +160,7 @@
   </div>
   <p class="hint">
     Cascada 将使用 {tvStatus?.browserPath?.includes("Edge") ? "Edge" : tvStatus?.browserPath?.includes("Brave") ? "Brave" : "Chrome"} 以及沙箱配置文件打开 TradingView。
-    登录后随便下一笔小单 — 你的主账户会自动出现在这里。
+    登录后随便下一笔小单 — 你的信号端会自动出现在这里。
   </p>
   <p class="hint">
     邮箱/密码以及 Google/Apple OAuth 均可正常使用 — Cascada 会将 Google + Apple
