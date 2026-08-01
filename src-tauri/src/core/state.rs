@@ -1,10 +1,10 @@
 use crate::connectors::file_bridge::cascada_root;
 use crate::connectors::{spawn_connector, ConnectorHandle};
-use crate::core::engine::CopyEngine;
+use crate::core::engine::{translate_symbol, CopyEngine};
 use crate::core::events::{LogEntry, LogLevel, EVT_ACCOUNT, EVT_LOG, EVT_QUOTE, EVT_SYMBOLS, EVT_TRADE};
 use crate::core::model::*;
 use crate::core::persistence::{self, Snapshot};
-use crate::core::ticket_map::TicketMap;
+use crate::core::ticket_map::{MasterKey, TicketMap};
 use crate::sidecar::TvProxyManager;
 use anyhow::Result;
 use dashmap::DashMap;
@@ -47,6 +47,10 @@ pub struct AppState {
     pub last_fail_notify: DashMap<String, i64>,
     /// Per-symbol throttle for quote-driven trailing-stop checks.
     pub trailing_check_at: DashMap<String, std::time::Instant>,
+    /// Rules that already ran the post-restart position reconciliation
+    /// (slave Resync → master Resync, rebuilding ticket_map so pre-existing
+    /// positions keep following master closes).
+    pub synced_rules: DashMap<String, bool>,
     /// Active per-account subscription set (uppercased symbols). Authoritative
     /// source replayed to the EA on reconnect.
     pub subscriptions: DashMap<String, Vec<String>>,
@@ -78,6 +82,7 @@ impl AppState {
             hb_alerted: DashMap::new(),
             last_fail_notify: DashMap::new(),
             trailing_check_at: DashMap::new(),
+            synced_rules: DashMap::new(),
             subscriptions: DashMap::new(),
             symbols: DashMap::new(),
             ticket_map: Arc::new(TicketMap::new()),
@@ -332,6 +337,16 @@ impl AppState {
                 if is_mirror && rule_id.is_empty() {
                     rule_id = self.ticket_map.rule_for_slave(&t.account_id, &t.ticket);
                 }
+                // 重启/升级后：slave 持仓无 origin（旧订单无 c: 备注且无持久化记录）
+                // 时，尝试按 (翻译后品种, 方向, 手数) 匹配同规则 master 持仓回填映射。
+                if rule_id.is_empty() && !is_mirror && t.origin_ticket.is_none() {
+                    if let Some(filled) = self.backfill_slave_from_master(&t) {
+                        t.rule_id = filled.clone();
+                        rule_id = filled;
+                        self.emit_log(LogLevel::Info, &t.account_id,
+                            format!("回填映射：slave {} ↔ master（品种/方向/手数匹配）", t.ticket));
+                    }
+                }
                 if !rule_id.is_empty() { t.rule_id = rule_id; }
                 // 登记移动止损/保本跟踪（仅 mirror 的 slave 持仓）
                 if is_mirror {
@@ -570,6 +585,15 @@ impl AppState {
                 s.tick_risk().await;
             }
         });
+        // 独立循环：自动订阅 + 重启对账（避免在 tick_risk 里持有非 Send 引用）
+        let s2 = self.clone();
+        tauri::async_runtime::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                s2.ensure_rule_subscriptions().await;
+                s2.reconcile_rule_mappings().await;
+            }
+        });
     }
 
     async fn tick_risk(self: &Arc<Self>) {
@@ -635,19 +659,17 @@ impl AppState {
     /// 优先用 EA 上报的 quote.unrealized（该品种全部持仓的浮动盈亏，
     /// 100 就是 100，无需合约估算）；新版 EA 未上报时回退到
     /// 差价 × 合约大小启发式（旧 EA 的近似）。
+    /// 直接扫 trades（按 rule_id + 未平仓），不依赖 ticket_map ——
+    /// 这样即使映射尚未回填（重启初期）也能监控。
     fn rule_floating_loss(&self, rule: &CopyRule) -> Option<f64> {
-        let slaves = self.ticket_map.slaves_for_rule(&rule.id);
-        if slaves.is_empty() { return Some(0.0); }
         let trades = self.trades.read();
         let mut total = 0.0_f64;
         // 收集 (account, symbol) 去重集合 —— EA 报的是符号级浮亏
         let mut seen = std::collections::HashSet::new();
-        for s in &slaves {
-            let t = trades.iter().find(|t| t.ticket == s.ticket
-                && t.account_id == s.account_id).cloned();
-            let Some(t) = t else { continue; };
-            if !seen.insert((s.account_id.clone(), t.symbol.clone())) { continue; }
-            let q = self.quotes.get(&(s.account_id.clone(), t.symbol.clone())).map(|v| v.value().clone());
+        for t in trades.iter() {
+            if t.rule_id != rule.id || t.closed_at.is_some() { continue; }
+            if !seen.insert((t.account_id.clone(), t.symbol.clone())) { continue; }
+            let q = self.quotes.get(&(t.account_id.clone(), t.symbol.clone())).map(|v| v.value().clone());
             let Some(q) = q else { continue; };
             // 优先：EA 上报的符号级浮亏（账户货币，直接相加）
             if let Some(u) = q.unrealized {
@@ -666,6 +688,96 @@ impl AppState {
             if loss > 0.0 { total += loss; }
         }
         Some(total)
+    }
+
+    /// 重启/升级后回填：slave 持仓无 origin 时，按 (翻译后品种, 方向, 手数)
+    /// 匹配同规则 master 的未映射持仓，直接建立映射。多义时放弃（宁缺毋滥）。
+    fn backfill_slave_from_master(&self, t: &Trade) -> Option<String> {
+        let rules = self.rules.read().clone();
+        let trades = self.trades.read();
+        for rule in rules {
+            if !rule.enabled || rule.slave_id != t.account_id { continue; }
+            let mut match_cnt = 0usize;
+            let mut matched: Option<(String, String)> = None;
+            for m in trades.iter() {
+                if m.account_id != rule.master_id || m.closed_at.is_some() { continue; }
+                if translate_symbol(&rule, &m.symbol) != t.symbol || m.side != t.side { continue; }
+                let vol_diff = (m.volume - t.volume).abs();
+                if vol_diff > m.volume.max(t.volume) * 0.01 + 0.001 { continue; }
+                // master 已映射过（该持仓已有 slave 跟随）则不参与匹配
+                if !self.ticket_map.slaves_for(&MasterKey {
+                    account_id: m.account_id.clone(), ticket: m.ticket.clone(),
+                }).is_empty() { continue; }
+                match_cnt += 1;
+                matched = Some((m.account_id.clone(), m.ticket.clone()));
+                if match_cnt > 1 { return None; }
+            }
+            if let Some((ma, mt)) = matched {
+                self.ticket_map.backfill(&t.account_id, &t.ticket,
+                    MasterKey { account_id: ma, ticket: mt }, rule.id.clone());
+                return Some(rule.id.clone());
+            }
+        }
+        None
+    }
+
+    /// 确保启用规则涉及的 slave 账户订阅其持仓品种——浮亏监控与
+    /// 报价驱动功能都依赖 EA 上报 quote。仅在订阅集合变化时下发命令。
+    pub async fn ensure_rule_subscriptions(self: &Arc<Self>) {
+        // 用块作用域把 trades 读锁限制在收集阶段，避免 guard 跨 await 存活
+        let needed: std::collections::HashMap<String, std::collections::BTreeSet<String>> = {
+            let rules = self.rules.read().clone();
+            let trades = self.trades.read();
+            let mut needed: std::collections::HashMap<String, std::collections::BTreeSet<String>> = Default::default();
+            for rule in rules {
+                if !rule.enabled { continue; }
+                // slave 端已持仓的品种（直接按 slave 符号订阅）
+                for t in trades.iter() {
+                    if t.account_id == rule.slave_id && t.closed_at.is_none() {
+                        needed.entry(rule.slave_id.clone())
+                            .or_default()
+                            .insert(t.symbol.clone());
+                    }
+                }
+            }
+            needed
+        };
+        for (acc, syms) in needed {
+            let list: Vec<String> = syms.into_iter().collect();
+            let cur = self.subscriptions.get(&acc).map(|v| v.value().clone()).unwrap_or_default();
+            if cur == list { continue; }
+            self.set_subscription(&acc, list).await;
+        }
+    }
+
+    /// 重启后的持仓对账：每个启用规则在 master/slave 双方都连接后，
+    /// 先让 slave 上报持仓（回填映射），2 秒后再让 master 上报持仓
+    /// （引擎幂等匹配 orphan slave，跳过重复下单）。这样 app/EA 重启后
+    /// 旧持仓的 master↔slave 映射得以重建，平仓能继续跟随。
+    pub async fn reconcile_rule_mappings(self: &Arc<Self>) {
+        let rules = self.rules.read().clone();
+        for rule in rules {
+            if !rule.enabled { continue; }
+            if self.synced_rules.contains_key(&rule.id) { continue; }
+            let master_conn = self.accounts.get(&rule.master_id).map(|a| a.connected).unwrap_or(false);
+            let slave_conn = self.accounts.get(&rule.slave_id).map(|a| a.connected).unwrap_or(false);
+            if !master_conn || !slave_conn { continue; }
+            // 先 slave 后 master，保证 master resync 时能找到 orphan slave
+            if let Some(h) = self.connector_handle(&rule.slave_id) {
+                let _ = h.send(ConnectorCmd::Resync).await;
+            }
+            let s = self.clone();
+            let master_id = rule.master_id.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                if let Some(h) = s.connector_handle(&master_id) {
+                    let _ = h.send(ConnectorCmd::Resync).await;
+                }
+            });
+            self.synced_rules.insert(rule.id.clone(), true);
+            self.emit_log(LogLevel::Info, &rule.master_id,
+                format!("重启对账：已请求同步规则「{}」的持仓映射", rule.name));
+        }
     }
 
     /// Look up an MT account by (platform, login) or create one on the fly.

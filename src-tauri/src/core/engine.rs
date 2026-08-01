@@ -117,6 +117,31 @@ impl CopyEngine {
         }
     }
 
+    /// 查找 slave 账户中与 master 持仓等价（翻译后品种+方向+手数）、
+    /// 且尚未建立映射的"孤儿"持仓 —— 用于 app/EA 重启后的映射回填，
+    /// 使旧持仓能重新跟随 master 平仓。多义（多笔匹配）时返回 None。
+    fn find_orphan_slave(&self, rule: &CopyRule, t: &Trade) -> Option<crate::core::ticket_map::SlaveRef> {
+        let slave_symbol = translate_symbol(rule, &t.symbol);
+        let trades = self.state.trades.read();
+        let mut found: Option<crate::core::ticket_map::SlaveRef> = None;
+        for s in trades.iter() {
+            if s.account_id != rule.slave_id || s.closed_at.is_some() { continue; }
+            if s.symbol != slave_symbol || s.side != t.side { continue; }
+            let vol_diff = (s.volume - t.volume).abs();
+            if vol_diff > (s.volume.max(t.volume)) * 0.01 + 0.001 { continue; }
+            // 已映射（有 rule_id 或能反查到 master）则跳过
+            let mapped = !self.state.ticket_map.rule_for_slave(&s.account_id, &s.ticket).is_empty();
+            if mapped { continue; }
+            if found.is_some() { return None; } // 多义，放弃本次回填
+            found = Some(crate::core::ticket_map::SlaveRef {
+                account_id: s.account_id.clone(),
+                ticket: s.ticket.clone(),
+                rule_id: rule.id.clone(),
+            });
+        }
+        found
+    }
+
     pub async fn on_trade_opened(&self, t: &Trade) {
         let rules: Vec<CopyRule> = self.state.rules.read().iter()
             .filter(|r| r.enabled && r.master_id == t.account_id)
@@ -133,6 +158,21 @@ impl CopyEngine {
         let mut caps_cache: HashMap<String, SlaveCaps> = HashMap::new();
 
         for rule in rules {
+            // resync（补单/重启同步）幂等：若 slave 已有等价持仓且未映射，
+            // 视为已跟单 —— 回填映射并跳过开单，避免重复下单。
+            if t.resync {
+                if let Some(orphan) = self.find_orphan_slave(&rule, t) {
+                    self.state.ticket_map.backfill(
+                        &orphan.account_id, &orphan.ticket,
+                        MasterKey { account_id: t.account_id.clone(), ticket: t.ticket.clone() },
+                        rule.id.clone(),
+                    );
+                    self.state.emit_log(LogLevel::Info, &rule.slave_id,
+                        format!("resync: slave {} 已镜像 master {}（回填映射，跳过重复下单）",
+                            orphan.ticket, t.ticket));
+                    continue;
+                }
+            }
             let caps = if rule.max_open_positions > 0
                 || rule.max_exposure_lots > 0.0
                 || rule.max_daily_loss > 0.0
@@ -539,7 +579,9 @@ fn contains_ci(haystack: &str, needle: &str) -> bool {
     false
 }
 
-fn translate_symbol(rule: &CopyRule, master_sym: &str) -> String {
+/// 把信号端品种翻译成跟单端品种（剥离前缀/后缀 + 符号映射）。
+/// `pub` 供 state.rs 在重启后的映射回填中复用。
+pub fn translate_symbol(rule: &CopyRule, master_sym: &str) -> String {
     // Strip broker-side decorations off the master ticker first so the rest
     // of the pipeline sees a canonical name. Mirrors the slave prefix/suffix
     // but in reverse: "EURUSDm" + strip_suffix "m" → "EURUSD".
