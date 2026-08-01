@@ -732,7 +732,7 @@ void DoOpenMarket(const string line)
    double sl   = StringToDouble(JsonField(line, "sl"));
    double tp   = StringToDouble(JsonField(line, "tp"));
    int    slip = (int)StringToInteger(JsonField(line, "slippage"));
-   long   magic = StringToInteger(JsonField(line, "magic"));
+   long   mgc = StringToInteger(JsonField(line, "magic"));
    string origin = JsonField(line, "ticket");
    string cmt = BuildComment(origin, JsonField(line, "comment"));
    if(!EnsureSymbolReady(sym)) return;
@@ -747,7 +747,7 @@ void DoOpenMarket(const string line)
    int    pts   = (slip > 0 && point > 0) ? (int)MathRound(slip * PipSize(sym) / point) : 10;
    trade.SetDeviationInPoints(pts);
    trade.SetTypeFillingBySymbol(sym);
-   trade.SetMagicNumber(magic);
+   trade.SetExpertMagicNumber(mgc);
    if(!trade.PositionOpen(sym, t, vol, price, sl, tp, cmt))
       WriteLog("error", "open failed " + sym + ": " + IntegerToString(trade.ResultRetcode())
                + " " + trade.ResultComment());
@@ -764,7 +764,7 @@ void DoOpenPending(const string line, bool is_limit)
    double sl   = StringToDouble(JsonField(line, "sl"));
    double tp   = StringToDouble(JsonField(line, "tp"));
    long expiry_ms = StringToInteger(JsonField(line, "expiry"));
-   long magic = StringToInteger(JsonField(line, "magic"));
+   long mgc = StringToInteger(JsonField(line, "magic"));
    string origin = JsonField(line, "ticket");
    string cmt = BuildComment(origin, JsonField(line, "comment"));
    if(!EnsureSymbolReady(sym)) return;
@@ -776,7 +776,7 @@ void DoOpenPending(const string line, bool is_limit)
    ENUM_ORDER_TYPE_TIME tt = (expiry_ms > 0) ? ORDER_TIME_SPECIFIED : ORDER_TIME_GTC;
    datetime expiry_dt = (expiry_ms > 0) ? (datetime)(expiry_ms / 1000) : (datetime)0;
    trade.SetTypeFillingBySymbol(sym);
-   trade.SetMagicNumber(magic);
+   trade.SetExpertMagicNumber(mgc);
    bool ok;
    if(side == "Sell")
       ok = is_limit ? trade.SellLimit(vol, tgt, sym, sl, tp, tt, expiry_dt, cmt)
