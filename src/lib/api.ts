@@ -213,6 +213,8 @@ export const api = {
   listRules: () => invoke<CopyRule[]>("list_rules"),
   upsertRule: (rule: CopyRule) => invoke<CopyRule>("upsert_rule", { rule }),
   deleteRule: (id: string) => invoke<void>("delete_rule", { id }),
+  /** 补单：让信号端重新上报持仓，缺失的跟单订单会被补开（忽略跟单时效）。 */
+  resyncRule: (id: string) => invoke<string>("resync_rule", { id }),
 
   listTrades: () => invoke<Trade[]>("list_trades"),
 

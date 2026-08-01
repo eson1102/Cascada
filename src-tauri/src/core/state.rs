@@ -316,7 +316,7 @@ impl AppState {
                     sl: None, tp: None,
                     opened_at: ts, closed_at: Some(ts), profit,
                     origin_ticket: None, comment: String::new(), pip_size: 0.0,
-                    feed: String::new(), magic: 0,
+                    feed: String::new(), magic: 0, resync: false,
                 };
                 self.emit_trade(&t);
                 engine.on_trade_closed(&account_id, &ticket).await;
@@ -456,6 +456,20 @@ impl AppState {
             }
         }
         Ok(())
+    }
+
+    /// 补单：请信号端 EA 重新上报全部当前持仓（open 事件带 resync 标记）。
+    /// 引擎对已跟单的持仓自动跳过，缺失的持仓会补开（绕过交易时效过滤）。
+    pub async fn resync_rule(self: &Arc<Self>, rule_id: &str) -> Result<String, String> {
+        let rule = self.rules.read().iter()
+            .find(|r| r.id == rule_id).cloned()
+            .ok_or_else(|| "找不到该规则".to_string())?;
+        let master_id = rule.master_id.clone();
+        let handle = self.connectors.get(&master_id)
+            .ok_or_else(|| "信号端账户未连接".to_string())?;
+        handle.send(crate::core::model::ConnectorCmd::Resync).await
+            .map_err(|e| e.to_string())?;
+        Ok(format!("已请求补单（信号端 {} 的持仓将重新同步）", master_id))
     }
 
     /// Look up an MT account by (platform, login) or create one on the fly.

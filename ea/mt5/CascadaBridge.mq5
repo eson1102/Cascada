@@ -375,7 +375,7 @@ void WritePong()
 //+------------------------------------------------------------------+
 //| Per-event writers
 //+------------------------------------------------------------------+
-void WriteOpen(ulong ticket)
+void WriteOpen(ulong ticket, bool resync = false)
 {
    if(!PositionSelectByTicket(ticket)) return;
    string sym  = PositionGetString(POSITION_SYMBOL);
@@ -399,6 +399,7 @@ void WriteOpen(ulong ticket)
       ",\"pip_size\":"   + F5(PipSize(sym)) +
       ",\"comment\":\""  + Esc(cmt) + "\"" +
       ",\"origin\":\""   + Esc(ExtractOrigin(cmt)) + "\"" +
+      ",\"resync\":"     + (resync ? "true" : "false") +
       ",\"ts\":"         + IntegerToString(ts_ms);
    WriteEvent("open", body);
 }
@@ -631,7 +632,23 @@ void HandleCommand(const string line)
    else if(op == "ping")           WritePong();
    else if(op == "subscribe")      DoSubscribe(line);
    else if(op == "list_symbols")   DoListSymbols();
+   else if(op == "resync")         DoResync();
    else                            WriteLog("warn", "unknown op: " + op);
+}
+
+// 补单：把当前全部持仓重新上报为 open 事件（带 resync=true），
+// 引擎会为缺失的跟单订单补开，已跟单的自动跳过。
+void DoResync()
+{
+   int n = 0;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0) continue;
+      WriteOpen(ticket, true);
+      n++;
+   }
+   WriteLog("info", "resync: " + IntegerToString(n) + " positions re-reported");
 }
 
 void DoOpenMarket(const string line)

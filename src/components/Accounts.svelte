@@ -422,7 +422,7 @@
   }
   .row:first-child { border-top: none; }
   .row.master {
-    background: linear-gradient(180deg, var(--mc-tint, #fbfcff) 0%, #ffffff 100%);
+    background: linear-gradient(180deg, var(--mc-tint, var(--surface-muted)) 0%, var(--surface) 100%);
     grid-template-columns: auto auto 1fr auto auto auto auto;
     border-top: none;
   }

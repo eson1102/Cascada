@@ -111,6 +111,30 @@
     dispatch("refresh");
   }
 
+  // 补单：请求信号端重新上报持仓，缺失的跟单订单会被补开（忽略跟单时效）。
+  let resyncingId: string | null = null;
+  async function resync(r: CopyRule) {
+    if (resyncingId) return;
+    const m = idx.get(r.master_id);
+    const master = m ? labelOf(idx, r.master_id) : r.master_id;
+    const name = r.name?.trim() || "此规则";
+    const ok = await ask(
+      `补单“${name}”（信号端 ${master}）？\n\n将把信号端当前所有持仓与跟单端比对，缺失的订单立即补开（不受跟单时效限制），已跟单的自动跳过。`,
+      { title: "确认补单", kind: "info", okLabel: "补单", cancelLabel: "取消" });
+    if (!ok) return;
+    resyncingId = r.id;
+    try {
+      const msg = await api.resyncRule(r.id);
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(msg, { title: "补单", kind: "info", okLabel: "好" });
+    } catch (e) {
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(String(e), { title: "补单失败", kind: "error", okLabel: "好" });
+    } finally {
+      resyncingId = null;
+    }
+  }
+
   function csvBind(arr: string[]): string { return arr.join(", "); }
   function fromCsv(s: string): string[] {
     return s.split(",").map((x) => x.trim()).filter(Boolean);
@@ -283,6 +307,10 @@
               <span class="toggle-label">{r.enabled ? "运行中" : "已暂停"}</span>
             </button>
             <button class="icon-btn" title="编辑规则" on:click={() => editRule(r)}>✎</button>
+            <button class="icon-btn" class:busy={resyncingId === r.id} title="补单：补上信号端持仓中缺失的跟单订单（忽略跟单时效）"
+                    disabled={resyncingId !== null} on:click={() => resync(r)}>
+              {resyncingId === r.id ? "…" : "补"}
+            </button>
             <button class="icon-btn danger" title="删除规则" on:click={() => remove(r)}>✕</button>
           </div>
         </div>
@@ -855,7 +883,7 @@
     gap: 16px;
     align-items: center;
     padding: 16px 20px 16px 24px;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--border);
     transition: background 0.12s;
   }
   .rule:last-child { border-bottom: none; }
@@ -935,7 +963,7 @@
     border: 1px solid transparent;
   }
   .cfg-chip.primary { background: var(--primary-soft); color: var(--primary); }
-  .cfg-chip.info    { background: #f1f5f9; color: #475569; }
+  .cfg-chip.info    { background: var(--surface-muted); color: var(--text-2); }
   .cfg-chip.warn    { background: var(--surface)beb; color: #b45309; }
   .cfg-chip.danger  { background: #fef2f2; color: #b91c1c; }
 
@@ -1110,7 +1138,7 @@
     font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em;
     color: var(--text-muted); margin: 24px 0 10px;
     padding-bottom: 6px;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--border);
   }
 
   /* Form grid — predictable 2-col, collapses to 1 below ~480px container */
@@ -1259,8 +1287,8 @@
     margin-top: 14px;
     padding: 10px 12px;
     border-radius: 8px;
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
     font-size: 12px; color: var(--text-2);
     line-height: 1.5;
   }

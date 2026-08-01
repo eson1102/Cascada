@@ -28,6 +28,12 @@ pub async fn delete_rule(state: S<'_>, id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 补单：让信号端重新上报持仓，缺失的跟单订单会被补开（忽略跟单时效）。
+#[tauri::command]
+pub async fn resync_rule(state: S<'_>, id: String) -> Result<String, String> {
+    state.resync_rule(&id).await
+}
+
 #[tauri::command]
 pub async fn list_trades(state: S<'_>) -> Result<Vec<Arc<Trade>>, String> {
     Ok(state.trades.read().iter().cloned().collect())

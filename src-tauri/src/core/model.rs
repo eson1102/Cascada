@@ -226,6 +226,11 @@ pub struct Trade {
     /// master-magic filter.
     #[serde(default)]
     pub magic: i64,
+    /// True when this open event came from a manual resync (补单) request —
+    /// the engine bypasses the trade-age filter for it so old positions
+    /// can be back-filled.
+    #[serde(default)]
+    pub resync: bool,
 }
 
 /// Kind of pending order — mirrors the master/slave broker's `OP_BUYLIMIT`
@@ -327,5 +332,9 @@ pub enum ConnectorCmd {
     CancelPending { ticket: String },
     Subscribe { symbols: Vec<String> },
     ListSymbols,
+    /// Ask the EA to re-report all currently-open positions as open events
+    /// with the `resync` flag set. The engine then fills any slave orders
+    /// that are missing (bypassing the trade-age filter).
+    Resync,
     Shutdown,
 }

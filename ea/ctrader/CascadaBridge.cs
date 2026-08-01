@@ -99,20 +99,34 @@ namespace cAlgo.Robots
                 F(Account.UnrealizedNetProfit), Positions.Count, PendingOrders.Count));
         }
 
-        private void WriteOpen(Position p)
+        private void WriteOpen(Position p, bool resync = false)
         {
             string origin = ExtractOrigin(p.Comment);
             var sym = TryGetSymbol(p.SymbolName);
             double lots    = sym != null ? sym.VolumeInUnitsToQuantity(p.VolumeInUnits) : p.VolumeInUnits / 100000.0;
             double pipSize = sym != null ? sym.PipSize : 0;
             WriteEvent("open", string.Format(Inv,
-                "\"ticket\":\"{0}\",\"symbol\":\"{1}\",\"side\":\"{2}\",\"volume\":{3},\"units\":{4},\"price\":{5},\"sl\":{6},\"tp\":{7},\"commission\":{8},\"swap\":{9},\"pip_size\":{10},\"label\":\"{11}\",\"comment\":\"{12}\",\"origin\":\"{13}\",\"ts\":{14}",
+                "\"ticket\":\"{0}\",\"symbol\":\"{1}\",\"side\":\"{2}\",\"volume\":{3},\"units\":{4},\"price\":{5},\"sl\":{6},\"tp\":{7},\"commission\":{8},\"swap\":{9},\"pip_size\":{10},\"label\":\"{11}\",\"comment\":\"{12}\",\"origin\":\"{13}\",\"resync\":{14},\"ts\":{15}",
                 p.Id, Esc(p.SymbolName),
                 p.TradeType == TradeType.Buy ? "Buy" : "Sell",
                 F(lots), F(p.VolumeInUnits), F(p.EntryPrice),
                 F(p.StopLoss ?? 0), F(p.TakeProfit ?? 0),
                 F(p.Commissions), F(p.Swap),
-                F(pipSize), Esc(p.Label ?? ""), Esc(p.Comment ?? ""), Esc(origin), Now()));
+                F(pipSize), Esc(p.Label ?? ""), Esc(p.Comment ?? ""), Esc(origin),
+                resync ? "true" : "false", Now()));
+        }
+
+        // 补单：把当前全部持仓重新上报为 open 事件（带 resync=true），
+        // 引擎会为缺失的跟单订单补开，已跟单的自动跳过。
+        private void DoResync()
+        {
+            int n = 0;
+            foreach (var p in Positions)
+            {
+                WriteOpen(p, true);
+                n++;
+            }
+            TryLog("info", "resync: " + n + " positions re-reported");
         }
 
         private void WriteModify(Position p)
@@ -240,6 +254,7 @@ namespace cAlgo.Robots
                 case "cancel_all":      DoCancelAll();       break;
                 case "subscribe":       DoSubscribe(line);   break;
                 case "list_symbols":    DoListSymbols();     break;
+                case "resync":          DoResync();          break;
                 case "hello":           /* legacy, ignore */ break;
                 default: TryLog("warn", "unknown op: " + op); break;
             }

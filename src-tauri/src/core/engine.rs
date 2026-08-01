@@ -178,8 +178,9 @@ impl CopyEngine {
         if !rule.master_magic_list.is_empty() && !rule.master_magic_list.contains(&t.magic) {
             return Err("master magic mismatch");
         }
-        // Skip stale trades
-        if rule.skip_older_than_secs > 0 {
+        // Skip stale trades — bypassed for manual resync (补单) events so
+        // old master positions can be back-filled.
+        if !t.resync && rule.skip_older_than_secs > 0 {
             let now_ms = chrono::Utc::now().timestamp_millis();
             if (now_ms - t.opened_at) / 1000 > rule.skip_older_than_secs {
                 return Err("trade too old");
@@ -386,6 +387,7 @@ fn pending_as_trade(p: &PendingOrder) -> Trade {
         pip_size: p.pip_size,
         feed: p.feed.clone(),
         magic: p.magic,
+        resync: false,
     }
 }
 

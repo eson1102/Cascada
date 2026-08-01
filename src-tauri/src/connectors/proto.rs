@@ -35,6 +35,9 @@ pub enum C2S<'a> {
     Subscribe { symbols: &'a [String] },
     /// Ask the EA to dump its full available-symbol list (broker watchlist).
     ListSymbols {},
+    /// Ask the EA to re-report all open positions as `open` events with
+    /// `resync: true` — used by the per-rule 补单 button.
+    Resync {},
 }
 
 impl<'a> C2S<'a> {
@@ -75,6 +78,7 @@ impl<'a> C2S<'a> {
             ConnectorCmd::CancelPending { ticket } => C2S::Cancel { ticket },
             ConnectorCmd::Subscribe { symbols } => C2S::Subscribe { symbols },
             ConnectorCmd::ListSymbols => C2S::ListSymbols {},
+            ConnectorCmd::Resync => C2S::Resync {},
             ConnectorCmd::Shutdown => return None,
         })
     }
@@ -119,6 +123,8 @@ pub enum S2C {
         #[serde(default)] feed: String,
         /// MT4/MT5 order magic number; 0 when the connector has none.
         #[serde(default)] magic: i64,
+        /// Set when the position was re-reported by a manual resync (补单).
+        #[serde(default)] resync: bool,
     },
     Close {
         ticket: String, #[serde(default)] profit: f64, ts: i64,
@@ -199,14 +205,14 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
         S2C::Heartbeat { balance, equity, .. } =>
             { let _ = events.send(ConnectorEvent::Heartbeat {
                 account_id: id.clone(), balance, equity }); },
-        S2C::Open { ticket, symbol, side, volume, price, sl, tp, ts, origin, comment, pip_size, feed, magic, .. } =>
+        S2C::Open { ticket, symbol, side, volume, price, sl, tp, ts, origin, comment, pip_size, feed, magic, resync, .. } =>
             { let _ = events.send(ConnectorEvent::TradeOpened(Trade {
                 ticket, account_id: id.clone(),
                 symbol, side, volume, price,
                 sl: opt(sl), tp: opt(tp),
                 opened_at: ts, closed_at: None, profit: None,
                 origin_ticket: (!origin.is_empty()).then_some(origin),
-                comment, pip_size, feed, magic,
+                comment, pip_size, feed, magic, resync,
             })); },
         S2C::Close { ticket, profit, ts, .. } =>
             { let _ = events.send(ConnectorEvent::TradeClosed {
@@ -219,7 +225,7 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 sl: opt(sl), tp: opt(tp),
                 opened_at: 0, closed_at: None, profit: None,
                 origin_ticket: None, comment: String::new(), pip_size: 0.0,
-                feed: String::new(), magic: 0,
+                feed: String::new(), magic: 0, resync: false,
             })); },
         S2C::Pending { ticket, symbol, side, order_type, volume, target, sl, tp,
                        expiry, origin, comment, pip_size, feed, magic } => {
@@ -268,7 +274,7 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 opened_at, closed_at: Some(closed_at), profit: Some(profit),
                 origin_ticket: (!origin.is_empty()).then_some(origin),
                 comment: String::new(), pip_size: 0.0,
-                feed: String::new(), magic: 0,
+                feed: String::new(), magic: 0, resync: false,
             })); },
         S2C::HistoryDone { count } =>
             emit_log(events, id, LogLevel::Info, format!("history snapshot: {count} trades")),

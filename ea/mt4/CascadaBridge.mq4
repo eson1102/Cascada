@@ -293,7 +293,7 @@ void TrackPush()
 //+------------------------------------------------------------------+
 //| Per-event writers (assume OrderSelect already called)
 //+------------------------------------------------------------------+
-void WriteOpen()
+void WriteOpen(bool resync = false)
 {
    string sym  = OrderSymbol();
    string side = (OrderType() == OP_BUY) ? "Buy" : "Sell";
@@ -312,6 +312,7 @@ void WriteOpen()
       ",\"pip_size\":"   + F5(PipSize(sym)) +
       ",\"comment\":\""  + Esc(cmt) + "\"" +
       ",\"origin\":\""   + Esc(ExtractOrigin(cmt)) + "\"" +
+      ",\"resync\":"     + (resync ? "true" : "false") +
       ",\"ts\":"         + IntegerToString((long)OrderOpenTime() * 1000);
    WriteEvent("open", body);
 }
@@ -439,7 +440,7 @@ void PumpCommands()
    if(last_nl < 0) return;
    g_cmd_off += (ulong)(last_nl + 1);
 
-   string chunk = CharArrayToString(buf, 0, last_nl + 1, CP_UTF8);
+   string chunk = Utf8Decode(buf, 0, last_nl + 1);
    int from = 0, len = StringLen(chunk);
    for(int i = 0; i <= len; i++)
    {
@@ -465,11 +466,27 @@ void HandleCommand(const string line)
    else if(op == "modify_pending") DoModifyPending(line);
    else if(op == "cancel")         DoCancel(line);
    else if(op == "cancel_all")     DoCancelAll();
+   else if(op == "resync")         DoResync();
    else if(op == "snapshot")       SnapshotAll();
    else if(op == "ping")           WritePong();
    else if(op == "subscribe")      DoSubscribe(line);
    else if(op == "list_symbols")   DoListSymbols();
    else                            WriteLog("warn", "unknown op: " + op);
+}
+
+// 补单：把当前全部持仓重新上报为 open 事件（带 resync=true），
+// 引擎会为缺失的跟单订单补开，已跟单的自动跳过。
+void DoResync()
+{
+   int n = 0;
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+      if(OrderType() > OP_SELL) continue;
+      WriteOpen(true);
+      n++;
+   }
+   WriteLog("info", "resync: " + IntegerToString(n) + " positions re-reported");
 }
 
 void DoOpenMarket(const string line)
@@ -721,6 +738,43 @@ string BuildComment(const string origin, const string custom)
    string cmt = "c:" + origin;
    if(StringLen(custom) > 0) cmt = cmt + " " + custom;
    return cmt;
+}
+
+//+------------------------------------------------------------------+
+//| UTF-8 → UTF-16 decode (MT4 internal string).
+//| MT4's CharArrayToString does NOT support CP_UTF8 (that's MT5-only),
+//| so UTF-8 bytes from Cascada decode as ANSI → garbled Chinese
+//| comments. Hand-roll the decode instead.
+//+------------------------------------------------------------------+
+string Utf8Decode(const uchar &src[], int from, int count)
+{
+   string out = "";
+   int i = from, end = from + count;
+   int n = 0;
+   while(i < end)
+   {
+      uchar b0 = src[i];
+      ushort cp;
+      if(b0 < 0x80)
+      {
+         cp = b0; i += 1;
+      }
+      else if((b0 & 0xE0) == 0xC0 && i + 1 < end)
+      {
+         cp = (ushort)(((b0 & 0x1F) << 6) | (src[i + 1] & 0x3F)); i += 2;
+      }
+      else if((b0 & 0xF0) == 0xE0 && i + 2 < end)
+      {
+         cp = (ushort)(((b0 & 0x0F) << 12) | ((src[i + 1] & 0x3F) << 6) | (src[i + 2] & 0x3F)); i += 3;
+      }
+      else
+      {
+         cp = b0; i += 1;
+      }
+      StringSetCharacter(out, n, cp);
+      n++;
+   }
+   return out;
 }
 
 string F2(double d) { return DoubleToString(d, 2); }

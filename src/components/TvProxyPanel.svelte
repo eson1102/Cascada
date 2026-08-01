@@ -216,7 +216,7 @@
   }
   .tv-pill.on   { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
   .tv-pill.idle { background: #fef9c3; color: #92400e; border-color: #fde68a; }
-  .tv-pill.off  { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+  .tv-pill.off  { background: var(--surface-muted); color: var(--text-2); border-color: var(--border); }
   .tv-err { color: #b91c1c; }
 
   .install-row { display: flex; gap: 8px; flex-wrap: wrap; }
