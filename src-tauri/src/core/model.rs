@@ -43,6 +43,10 @@ pub struct Account {
     pub equity: f64,
     #[serde(default = "default_ccy")]
     pub currency: String,
+    /// 最近一次心跳的毫秒时间戳（0 = 从未收到）。用于信号端健康显示
+    /// 与断连告警（watchdog 检查）。
+    #[serde(default)]
+    pub last_seen: i64,
     #[serde(default, skip_serializing)]
     #[allow(dead_code)]
     pub password: Option<String>,

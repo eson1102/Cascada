@@ -40,6 +40,22 @@ pub async fn close_rule_positions(state: S<'_>, id: String) -> Result<String, St
     state.close_rule_positions(&id).await
 }
 
+/// 全局熔断：一键暂停/恢复所有规则。
+#[tauri::command]
+pub async fn set_all_rules_enabled(state: S<'_>, enabled: bool) -> Result<usize, String> {
+    let mut rules = state.rules.write();
+    let mut n = 0usize;
+    for r in rules.iter_mut() {
+        if r.enabled != enabled {
+            r.enabled = enabled;
+            n += 1;
+        }
+    }
+    drop(rules);
+    state.mark_dirty();
+    Ok(n)
+}
+
 #[tauri::command]
 pub async fn list_trades(state: S<'_>) -> Result<Vec<Arc<Trade>>, String> {
     Ok(state.trades.read().iter().cloned().collect())

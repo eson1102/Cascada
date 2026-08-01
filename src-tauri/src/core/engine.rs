@@ -3,6 +3,7 @@ use crate::core::model::*;
 use crate::core::state::AppState;
 use crate::core::ticket_map::MasterKey;
 use chrono::{Datelike, Timelike, Utc};
+use dashmap::DashMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -10,6 +11,21 @@ use std::time::Duration;
 /// Copy engine: fans out master events to slaves per enabled rule.
 pub struct CopyEngine {
     state: Arc<AppState>,
+    /// Per-slave-position state for 移动止损 / 保本 (quote-driven).
+    /// Key = slave ticket.
+    trailing: DashMap<String, TrackedPos>,
+}
+
+#[derive(Clone)]
+pub struct TrackedPos {
+    pub account_id: String, // slave account
+    pub rule_id: String,
+    pub symbol: String,
+    pub side: Side,
+    pub open: f64,
+    pub sl: f64,
+    pub tp: f64,
+    pub pip_size: f64,
 }
 
 #[derive(Default, Clone)]
@@ -20,7 +36,86 @@ struct SlaveCaps {
 }
 
 impl CopyEngine {
-    pub fn new(state: Arc<AppState>) -> Self { Self { state } }
+    pub fn new(state: Arc<AppState>) -> Self {
+        Self { state, trailing: DashMap::new() }
+    }
+
+    /// 记录 slave 持仓供移动止损/保本使用（在 mirror 成交回报时登记）。
+    pub fn track_slave(&self, ticket: &str, account_id: &str, rule_id: &str,
+        symbol: &str, side: Side, open: f64, sl: f64, tp: f64, pip_size: f64) {
+        self.trailing.insert(ticket.to_string(), TrackedPos {
+            account_id: account_id.to_string(), rule_id: rule_id.to_string(),
+            symbol: symbol.to_string(), side, open, sl, tp, pip_size,
+        });
+    }
+
+    /// 更新跟踪记录的 SL/TP（slave 端 modify 回报时）。
+    pub fn update_tracked(&self, ticket: &str, sl: f64, tp: f64) {
+        if let Some(mut kv) = self.trailing.get_mut(ticket) {
+            let p = kv.value_mut();
+            if sl > 0.0 { p.sl = sl; }
+            if tp > 0.0 { p.tp = tp; }
+        }
+    }
+
+    /// 移除跟踪记录（slave 平仓时）。
+    pub fn untrack(&self, ticket: &str) {
+        self.trailing.remove(ticket);
+    }
+
+    /// Quote 驱动：对每个启用移动止损/保本的规则检查其 slave 持仓，
+    /// 触发时向 slave 发送 Modify 指令（自动节流：只在新 SL 更优时发送）。
+    pub async fn trailing_check(&self, symbol: &str, bid: f64, ask: f64) {
+        if self.trailing.is_empty() { return; }
+        let mid = (bid + ask) / 2.0;
+        // 规则快照：只读一次
+        let rules: HashMap<String, (bool, f64, f64)> = self.state.rules.read().iter()
+            .map(|r| (r.id.clone(), (r.enabled, r.trailing_pips, r.breakeven_after_pips)))
+            .collect();
+
+        let mut actions: Vec<(String, String, f64)> = Vec::new();
+        for kv in self.trailing.iter() {
+            let ticket = kv.key().clone();
+            let p = kv.value().clone();
+            if p.symbol != symbol { continue; }
+            let Some(&(enabled, trail_pips, be_pips)) = rules.get(&p.rule_id) else { continue; };
+            if !enabled { continue; }
+            let pip = if p.pip_size > 0.0 { p.pip_size } else { 0.0001 };
+            let is_buy = matches!(p.side, Side::Buy);
+            let mut best_sl = p.sl;
+
+            // 移动止损：SL 跟随价格，只向有利方向移动
+            if trail_pips > 0.0 {
+                let dist = trail_pips * pip;
+                let new_sl = if is_buy { mid - dist } else { mid + dist };
+                let better = if is_buy { new_sl > best_sl } else { new_sl < best_sl };
+                if better { best_sl = new_sl; }
+            }
+            // 保本：盈利达到阈值后把 SL 移到开仓价附近（±1 pip 避免经纪商拒单）
+            if be_pips > 0.0 {
+                let gain = if is_buy { mid - p.open } else { p.open - mid };
+                if gain >= be_pips * pip {
+                    let be_sl = if is_buy { p.open + pip } else { p.open - pip };
+                    let better = if is_buy { be_sl > best_sl } else { be_sl < best_sl };
+                    if better { best_sl = be_sl; }
+                }
+            }
+            if best_sl != p.sl && best_sl > 0.0 {
+                actions.push((ticket.clone(), p.account_id.clone(), best_sl));
+            }
+        }
+
+        for (ticket, account_id, new_sl) in actions {
+            if let Some(h) = self.state.connector_handle(&account_id) {
+                let _ = h.send(ConnectorCmd::Modify {
+                    ticket: ticket.clone(), sl: Some(new_sl), tp: None,
+                }).await;
+            }
+            if let Some(mut kv) = self.trailing.get_mut(&ticket) {
+                kv.value_mut().sl = new_sl;
+            }
+        }
+    }
 
     pub async fn on_trade_opened(&self, t: &Trade) {
         let rules: Vec<CopyRule> = self.state.rules.read().iter()
@@ -226,11 +321,14 @@ impl CopyEngine {
             if let Some(h) = self.state.connector_handle(&s.account_id) {
                 let _ = h.send(ConnectorCmd::Close { ticket: s.ticket.clone() }).await;
             }
+            self.untrack(&s.ticket);
         }
         self.state.ticket_map.drop_master(&key);
     }
 
     pub async fn on_trade_modified(&self, t: &Trade) {
+        // 更新移动止损/保本跟踪（slave modify 回报时 key 是 slave ticket）
+        self.update_tracked(&t.ticket, t.sl.unwrap_or(0.0), t.tp.unwrap_or(0.0));
         let key = MasterKey { account_id: t.account_id.clone(), ticket: t.ticket.clone() };
         for s in self.state.ticket_map.slaves_for(&key) {
             if let Some(h) = self.state.connector_handle(&s.account_id) {

@@ -15,6 +15,8 @@ export interface Account {
   balance: number;
   equity: number;
   currency: string;
+  /** 最近一次心跳的毫秒时间戳；0 = 从未收到。 */
+  last_seen?: number;
 }
 
 export type LotMode = "Fixed" | "Multiplier" | "Equity" | "BalanceRatio" | "RiskPercent";
@@ -226,6 +228,8 @@ export const api = {
   resyncRule: (id: string) => invoke<string>("resync_rule", { id }),
   /** 清仓：平掉该规则产生的全部跟单持仓（并取消未成交挂单）。 */
   closeRulePositions: (id: string) => invoke<string>("close_rule_positions", { id }),
+  /** 全局熔断：一键暂停/恢复所有规则，返回变更的规则数。 */
+  setAllRulesEnabled: (enabled: boolean) => invoke<number>("set_all_rules_enabled", { enabled }),
 
   listTrades: () => invoke<Trade[]>("list_trades"),
 

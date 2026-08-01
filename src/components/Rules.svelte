@@ -157,7 +157,87 @@
     }
   }
 
+  // 全局熔断：一键暂停/恢复所有规则
+  $: allEnabled = rules.some((r) => r.enabled) && !rules.some((r) => !r.enabled);
+  let togglingAll = false;
+  async function toggleAllEnabled() {
+    if (togglingAll) return;
+    const target = !allEnabled;
+    const ok = await ask(
+      target
+        ? `恢复全部 ${rules.length} 条规则？\n\n所有规则将重新开始复制信号端交易。`
+        : `暂停全部 ${rules.length} 条规则？\n\n此后信号端的新交易将不再复制到任何跟单端。现有持仓不受影响。`,
+      { title: target ? "恢复全部规则" : "暂停全部规则（熔断）",
+        kind: target ? "info" : "warning", okLabel: target ? "恢复" : "暂停", cancelLabel: "取消" });
+    if (!ok) return;
+    togglingAll = true;
+    try {
+      const n = await api.setAllRulesEnabled(target);
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(`${n} 条规则已${target ? "恢复" : "暂停"}`, { title: "熔断", kind: "info", okLabel: "好" });
+    } catch (e) {
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(String(e), { title: "操作失败", kind: "error", okLabel: "好" });
+    } finally {
+      togglingAll = false;
+      dispatch("refresh");
+    }
+  }
+
   function csvBind(arr: string[]): string { return arr.join(", "); }
+
+  // ---- 规则导入/导出（单条 JSON）----
+  let importOpen = false;
+  let importText = "";
+  let importError = "";
+  let importing = false;
+
+  async function exportRule(r: CopyRule) {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(r, null, 2));
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message("规则已复制到剪贴板（JSON 格式）。\n可在其他设备/账户点击「导入」粘贴。", {
+        title: "导出规则", kind: "info", okLabel: "好" });
+    } catch (e) {
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(String(e), { title: "导出失败", kind: "error", okLabel: "好" });
+    }
+  }
+
+  function openImport() {
+    importText = "";
+    importError = "";
+    importOpen = true;
+  }
+
+  async function doImport() {
+    if (importing) return;
+    importing = true;
+    importError = "";
+    try {
+      const parsed = JSON.parse(importText);
+      const list: CopyRule[] = Array.isArray(parsed) ? parsed : [parsed];
+      let n = 0;
+      for (const item of list) {
+        if (!item || typeof item.id !== "string" || typeof item.master_id !== "string") {
+          throw new Error("数据格式不正确：缺少 id 或 master_id");
+        }
+        // 导入时给新 id，避免覆盖现有规则
+        const merged: CopyRule = { ...defaultRule(), ...item, id: crypto.randomUUID() };
+        await api.upsertRule(merged);
+        n++;
+      }
+      importOpen = false;
+      dispatch("refresh");
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(`成功导入 ${n} 条规则（已生成新 ID，不会覆盖现有规则）。`, {
+        title: "导入完成", kind: "info", okLabel: "好" });
+    } catch (e) {
+      importError = String(e);
+    } finally {
+      importing = false;
+    }
+  }
   function fromCsv(s: string): string[] {
     return s.split(",").map((x) => x.trim()).filter(Boolean);
   }
@@ -249,9 +329,18 @@
       <h2>跟单规则</h2>
       <span class="count-pill">{rules.length}</span>
     </div>
-    <button class="primary btn-new" on:click={newDraft} disabled={!!editing}>
-      <span class="plus">+</span> 新建规则
-    </button>
+    <div class="header-actions">
+      <button class="panic-btn" class:armed={!allEnabled}
+              title="行情剧烈时一键暂停所有规则；再次点击恢复"
+              on:click={toggleAllEnabled}>
+        <span class="panic-dot"></span>
+        <span>{allEnabled ? "全部暂停" : "全部恢复"}</span>
+      </button>
+      <button class="ghost sm" title="从剪贴板粘贴 JSON 导入规则" on:click={openImport}>导入</button>
+      <button class="primary btn-new" on:click={newDraft} disabled={!!editing}>
+        <span class="plus">+</span> 新建规则
+      </button>
+    </div>
   </div>
 
   {#if issuesCount > 0}
@@ -330,6 +419,7 @@
               <span class="toggle-track"><span class="toggle-thumb"></span></span>
               <span class="toggle-label">{r.enabled ? "运行中" : "已暂停"}</span>
             </button>
+            <button class="icon-btn" title="导出规则（复制 JSON）" on:click={() => exportRule(r)}>⧉</button>
             <button class="edit-btn" title="编辑规则" on:click={() => editRule(r)}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               <span>编辑</span>
@@ -353,6 +443,26 @@
     </div>
   {/if}
 </div>
+
+{#if importOpen}
+  <div class="overlay" on:click={() => (importOpen = false)}></div>
+  <div class="import-modal">
+    <h3 class="import-title">导入跟单规则</h3>
+    <p class="muted" style="font-size: 12px; margin: 0 0 8px;">
+      粘贴从「导出」复制的规则 JSON（支持单条或数组）。导入后会生成新 ID，不会覆盖现有规则。
+    </p>
+    <textarea class="import-area" bind:value={importText} spellcheck="false"
+              placeholder='[&#123;"id":"...","name":"我的规则", ...&#125;]'></textarea>
+    {#if importError}
+      <p class="import-error">{importError}</p>
+    {/if}
+    <div class="import-actions">
+      <button class="ghost" on:click={() => (importOpen = false)}>取消</button>
+      <button class="primary" disabled={importing || !importText.trim()}
+              on:click={doImport}>{importing ? "导入中…" : "导入"}</button>
+    </div>
+  </div>
+{/if}
 
 {#if editing}
   {@const e = editing}
@@ -654,7 +764,7 @@
                 <input id="max-floating" type="number" min="0" step="1" bind:value={editing.max_floating_loss} />
                 <span class="suffix">USD</span>
               </div>
-              <p class="f-help">跟单端持仓的浮亏超过此值时，自动全部平仓。0 = 关闭。</p>
+              <p class="f-help">跟单端持仓的浮亏超过此值时，自动全部平仓（按账户报价货币估算，黄金/指数/加密按品种合约大小折算）。0 = 关闭。</p>
             </div>
             <div class="field">
               <label class="f-label" for="max-age">跳过早于以下时间的交易</label>
@@ -898,6 +1008,48 @@
 <style>
   .rules-root { overflow: hidden; }
   .header-left { display: flex; align-items: center; gap: 10px; }
+  .header-actions { display: flex; align-items: center; gap: 8px; }
+
+  /* 导入弹窗 */
+  .import-modal {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    z-index: 60; width: min(560px, 92vw);
+    background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+  }
+  .import-title { margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+  .import-area {
+    width: 100%; min-height: 180px; resize: vertical;
+    padding: 10px; font-size: 12px; font-family: ui-monospace, monospace;
+    background: var(--surface-muted); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .import-error { color: var(--danger); font-size: 12px; margin: 8px 0 0; }
+  .import-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+  /* 全局熔断按钮（红色实心，暂停态更深） */
+  .panic-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--danger);
+    border-radius: 8px;
+    background: transparent;
+    font-size: 12px; font-weight: 600;
+    color: var(--danger);
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .panic-btn:hover { background: rgba(239, 68, 68, 0.1); }
+  .panic-btn.armed {
+    background: var(--danger); color: #fff;
+  }
+  .panic-btn.armed:hover { background: #b91c1c; }
+  .panic-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: currentColor;
+  }
   .count-pill {
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 22px; height: 20px; padding: 0 7px;

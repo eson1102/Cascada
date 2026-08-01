@@ -18,6 +18,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(state.clone())
@@ -71,6 +72,7 @@ fn main() {
             commands::delete_rule,
             commands::resync_rule,
             commands::close_rule_positions,
+            commands::set_all_rules_enabled,
             commands::list_trades,
             commands::export_settings,
             commands::import_settings,

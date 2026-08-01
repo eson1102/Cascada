@@ -33,6 +33,7 @@ pub async fn add_account(state: S<'_>, payload: AddAccountPayload) -> Result<Acc
         balance: 0.0,
         equity: 0.0,
         currency: "USD".into(),
+        last_seen: 0,
         password: payload.password,
     };
     state.accounts.insert(account.id.clone(), account.clone());

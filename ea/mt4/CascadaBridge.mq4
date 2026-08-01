@@ -90,6 +90,7 @@ int OnInit()
    g_dir      = "Cascada\\MT4\\" + login;
    g_evt_path = g_dir + "\\events.jsonl";
    g_cmd_path = g_dir + "\\cmd.jsonl";
+   g_orig_path = g_dir + "\\origins.dat";
 
    int trunc = FileOpen(g_evt_path, FFLAGS_W);
    if(trunc == INVALID_HANDLE)
@@ -105,6 +106,7 @@ int OnInit()
    if(ch != INVALID_HANDLE) { g_cmd_off = (ulong)FileSize(ch); FileClose(ch); }
 
    EventSetMillisecondTimer(PollMs);
+   LoadOrigins();
    CreateStatusLabel();
    UpdateStatusLabel();
    WriteWelcome();
@@ -813,6 +815,36 @@ string BuildComment(const string origin, const string custom)
 // no-custom comments still carry the marker as a fallback.
 struct OriginRec { int ticket; string origin; };
 OriginRec g_origins[];
+string    g_orig_path;
+
+// 持久化：把映射表存到磁盘，EA 重启后恢复（自定义备注的订单也能关联）。
+void SaveOrigins()
+{
+   int h = FileOpen(g_orig_path, FFLAGS_W);
+   if(h == INVALID_HANDLE) return;
+   for(int i = 0; i < ArraySize(g_origins); i++)
+      FileWriteString(h, IntegerToString(g_origins[i].ticket)
+                        + "|" + g_origins[i].origin + "\n");
+   FileClose(h);
+}
+
+void LoadOrigins()
+{
+   int h = FileOpen(g_orig_path, FFLAGS_R);
+   if(h == INVALID_HANDLE) return;
+   while(!FileIsEnding(h))
+   {
+      string line = FileReadString(h);
+      int pipe = StringFind(line, "|");
+      if(pipe > 0)
+      {
+         int t = (int)StringToInteger(StringSubstr(line, 0, pipe));
+         string o = StringSubstr(line, pipe + 1);
+         RememberOrigin(t, o);
+      }
+   }
+   FileClose(h);
+}
 
 void RememberOrigin(int ticket, const string origin)
 {
@@ -821,7 +853,11 @@ void RememberOrigin(int ticket, const string origin)
    {
       if(g_origins[i].ticket == ticket)
       {
-         if(g_origins[i].origin != origin) g_origins[i].origin = origin;
+         if(g_origins[i].origin != origin)
+         {
+            g_origins[i].origin = origin;
+            SaveOrigins();
+         }
          return;
       }
    }
@@ -836,6 +872,7 @@ void RememberOrigin(int ticket, const string origin)
    ArrayResize(g_origins, n + 1);
    g_origins[n].ticket = ticket;
    g_origins[n].origin = origin;
+   SaveOrigins();
 }
 
 string OriginFor(int ticket)

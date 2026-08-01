@@ -1,7 +1,21 @@
 <script lang="ts">
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher, onDestroy } from "svelte";
   import { api, defaultRule, type Account, type CopyRule } from "../lib/api";
   import { ask } from "@tauri-apps/plugin-dialog";
+
+  // 心跳健康显示：每秒刷新一次相对时间
+  let now = Date.now();
+  const hbTimer = setInterval(() => (now = Date.now()), 1000);
+  onDestroy(() => clearInterval(hbTimer));
+  function hbText(ms: number): string {
+    const s = Math.max(0, Math.floor((now - ms) / 1000));
+    if (s < 5) return "刚刚";
+    if (s < 60) return `${s} 秒前`;
+    return `${Math.floor(s / 60)} 分钟前`;
+  }
+  function hbStale(ms: number): boolean {
+    return ms > 0 && now - ms > 30_000;
+  }
   import EaUpdateBanner from "./EaUpdateBanner.svelte";
   import AddAccountWizard from "./AddAccountWizard.svelte";
 
@@ -247,6 +261,12 @@
               <span class="status-dot"></span>
               {m.connected ? "在线" : "离线"}
             </span>
+            {#if m.role === "Master" && (m.last_seen || 0) > 0}
+              <span class="hb-pill" class:stale={hbStale(m.last_seen || 0)}
+                    title="最后心跳时间 —— 超过 30 秒无心跳请检查 MT4/MT5 终端">
+                心跳 {hbText(m.last_seen || 0)}
+              </span>
+            {/if}
             <span class="num">{m.balance.toFixed(2)} <span class="muted">{m.currency}</span></span>
             <span class="num subtle">{m.equity.toFixed(2)}</span>
             <div class="row-actions">
@@ -526,6 +546,18 @@
   }
   .status-pill.online {
     background: #ecfdf5; color: #047857; border-color: #a7f3d0;
+  }
+
+  /* 信号端心跳健康提示 */
+  .hb-pill {
+    font-size: 10px; font-weight: 600;
+    padding: 3px 9px; border-radius: 999px;
+    background: var(--surface-muted); color: var(--text-2);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .hb-pill.stale {
+    background: #fef2f2; color: #b91c1c; border-color: #fecaca;
   }
   .status-dot {
     width: 6px; height: 6px; border-radius: 50%;

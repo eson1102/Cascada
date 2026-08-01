@@ -41,6 +41,12 @@ pub struct AppState {
     /// Tracks per-rule auto-close actions (e.g. weekend sweep) so the
     /// watchdog doesn't fire repeatedly within the same calendar day.
     pub last_close: DashMap<String, String>,
+    /// Per-account heartbeat-timeout alert latch (true = already alerted).
+    pub hb_alerted: DashMap<String, bool>,
+    /// Per-source throttle for failure desktop notifications (ms timestamps).
+    pub last_fail_notify: DashMap<String, i64>,
+    /// Per-symbol throttle for quote-driven trailing-stop checks.
+    pub trailing_check_at: DashMap<String, std::time::Instant>,
     /// Active per-account subscription set (uppercased symbols). Authoritative
     /// source replayed to the EA on reconnect.
     pub subscriptions: DashMap<String, Vec<String>>,
@@ -69,6 +75,9 @@ impl AppState {
             quotes: DashMap::new(),
             quote_last_emit: DashMap::new(),
             last_close: DashMap::new(),
+            hb_alerted: DashMap::new(),
+            last_fail_notify: DashMap::new(),
+            trailing_check_at: DashMap::new(),
             subscriptions: DashMap::new(),
             symbols: DashMap::new(),
             ticket_map: Arc::new(TicketMap::new()),
@@ -95,12 +104,35 @@ impl AppState {
         let _ = self.app_handle.set(h);
     }
 
+    /// 系统桌面通知（tauri-plugin-notification）；未初始化/无权限时静默忽略。
+    pub fn notify(&self, title: &str, body: &str) {
+        use tauri_plugin_notification::NotificationExt;
+        if let Some(h) = self.app_handle.get() {
+            let _ = h.notification()
+                .builder()
+                .title(title.to_string())
+                .body(body.to_string())
+                .show();
+        }
+    }
+
     pub fn emit_log(&self, level: LogLevel, source: &str, message: impl Into<String>) {
         let msg = message.into();
         match level {
             LogLevel::Error => tracing::error!("[{source}] {msg}"),
             LogLevel::Warn => tracing::warn!("[{source}] {msg}"),
             LogLevel::Info => tracing::info!("[{source}] {msg}"),
+        }
+        // 下单/平仓失败 → 桌面通知（节流：每 30 秒至多一条，避免刷屏）
+        if matches!(level, LogLevel::Error)
+            && (msg.contains("failed") || msg.contains("failed ") || msg.contains("失败"))
+        {
+            let now_ms = chrono::Utc::now().timestamp_millis();
+            let last = self.last_fail_notify.get(source).map(|v| *v.value()).unwrap_or(0);
+            if now_ms - last > 30_000 {
+                self.last_fail_notify.insert(source.to_string(), now_ms);
+                self.notify("跟单操作失败", &format!("[{source}] {msg}"));
+            }
         }
         if let Some(h) = self.app_handle.get() {
             let _ = h.emit(EVT_LOG, LogEntry {
@@ -271,11 +303,14 @@ impl AppState {
                 self.emit_log(LogLevel::Warn, &account_id, "disconnected");
             }
             ConnectorEvent::Heartbeat { account_id, balance, equity } => {
+                let now_ms = chrono::Utc::now().timestamp_millis();
                 self.with_account(&account_id, |a| {
-                    let changed = !a.connected || a.balance != balance || a.equity != equity;
+                    let changed = !a.connected || a.balance != balance || a.equity != equity
+                        || a.last_seen != now_ms;
                     a.connected = true;
                     a.balance = balance;
                     a.equity = equity;
+                    a.last_seen = now_ms;
                     changed
                 });
             }
@@ -298,6 +333,12 @@ impl AppState {
                     rule_id = self.ticket_map.rule_for_slave(&t.account_id, &t.ticket);
                 }
                 if !rule_id.is_empty() { t.rule_id = rule_id; }
+                // 登记移动止损/保本跟踪（仅 mirror 的 slave 持仓）
+                if is_mirror {
+                    engine.track_slave(&t.ticket, &t.account_id, &t.rule_id,
+                        &t.symbol, t.side, t.price,
+                        t.sl.unwrap_or(0.0), t.tp.unwrap_or(0.0), t.pip_size);
+                }
                 let t = Arc::new(t);
                 {
                     let mut trades = self.trades.write();
@@ -356,6 +397,14 @@ impl AppState {
                 q.symbol.make_ascii_uppercase();
                 let key = (q.account_id.clone(), q.symbol.clone());
                 self.emit_quote_throttled(&key, &q);
+                // 移动止损/保本：quote 驱动（1 秒节流，避免高频 tick 触发）
+                let now = std::time::Instant::now();
+                let last = self.trailing_check_at.get(&q.symbol)
+                    .map(|v| *v.value()).unwrap_or(std::time::Instant::now() - std::time::Duration::from_secs(10));
+                if now.duration_since(last) >= std::time::Duration::from_secs(1) {
+                    self.trailing_check_at.insert(q.symbol.clone(), now);
+                    engine.trailing_check(&q.symbol, q.bid, q.ask).await;
+                }
                 self.quotes.insert(key, q);
             }
             ConnectorEvent::PendingOpened(p) => {
@@ -534,6 +583,9 @@ impl AppState {
                         self.emit_log(LogLevel::Warn, &rule.master_id,
                             format!("浮亏 ${:.2} 超过阈值 ${:.2}，自动清仓（规则：{}）",
                                 loss, rule.max_floating_loss, rule.name));
+                        self.notify(&format!("浮亏自动清仓（{}）", rule.name),
+                            &format!("浮亏 ${:.2} 超过阈值 ${:.2}，已全部平仓。",
+                                loss, rule.max_floating_loss));
                         let _ = self.close_rule_positions(&rule.id).await;
                     }
                 }
@@ -549,16 +601,39 @@ impl AppState {
                     if dup.as_deref() != Some(&today) {
                         self.emit_log(LogLevel::Info, &rule.master_id,
                             format!("周末清盘（周五 20:00 UTC）触发（规则：{}）", rule.name));
+                        self.notify(&format!("周末清盘（{}）", rule.name),
+                            "周五 20:00 UTC 到达，该规则全部跟单持仓已平仓，避开周末跳空。");
                         let _ = self.close_rule_positions(&rule.id).await;
                         self.last_close.insert(rule.id.clone(), today);
                     }
                 }
             }
         }
+
+        // ---- 信号端心跳超时告警（30 秒无心跳）----
+        let now_ms = chrono::Utc::now().timestamp_millis();
+        for kv in self.accounts.iter() {
+            let id = kv.key().clone();
+            let (role, last_seen, label) = (kv.value().role, kv.value().last_seen, kv.value().label.clone());
+            if role != crate::core::model::AccountRole::Master || last_seen <= 0 { continue; }
+            let age_ms = now_ms - last_seen;
+            let alerted = self.hb_alerted.get(&id).map(|v| *v.value()).unwrap_or(false);
+            if age_ms > 30_000 && !alerted {
+                self.hb_alerted.insert(id.clone(), true);
+                self.emit_log(LogLevel::Warn, &id,
+                    format!("信号端「{}」心跳超时（{} 秒无数据），可能已断开！",
+                        label, age_ms / 1000));
+                self.notify(&format!("信号端「{label}」心跳超时"),
+                    &format!("已 {} 秒没有收到信号端数据，请检查 MT4/MT5 终端与 EA 是否在线。", age_ms / 1000));
+            } else if age_ms <= 30_000 && alerted {
+                self.hb_alerted.insert(id.clone(), false);
+            }
+        }
     }
 
     /// 估算该规则下全部 slave 持仓的浮亏（USD）。用 EA 上报的 quote；
-    /// 外汇按 100000 单位标价，便于在不解析合约大小时给出保守估计。
+    /// 合约大小按品种启发式推断（外汇 100000 / 黄金 100oz / 白银 5000oz /
+    /// 加密 1 / 指数 1），避免对非外汇品种误判。
     fn rule_floating_loss(&self, rule: &CopyRule) -> Option<f64> {
         let slaves = self.ticket_map.slaves_for_rule(&rule.id);
         if slaves.is_empty() { return Some(0.0); }
@@ -570,7 +645,7 @@ impl AppState {
             let Some(t) = t else { continue; };
             let q = self.quotes.get(&(s.account_id.clone(), t.symbol.clone())).map(|v| v.value().clone());
             let Some(q) = q else { continue; };
-            let units = (t.volume * 100000.0).max(0.0);
+            let units = (t.volume * contract_size_for(&t.symbol)).max(0.0);
             let is_buy = matches!(t.side, Side::Buy);
             let current = if is_buy { q.bid } else { q.ask };
             let loss = if is_buy {
@@ -613,6 +688,7 @@ impl AppState {
             connected: false,
             balance: 0.0, equity: 0.0,
             currency: "USD".into(),
+        last_seen: 0,
             password: None,
         };
         self.accounts.insert(account.id.clone(), account.clone());
@@ -648,6 +724,7 @@ impl AppState {
             connected: false,
             balance: 0.0, equity: 0.0,
             currency: "USD".into(),
+        last_seen: 0,
             password: None,
         };
         self.accounts.insert(account.id.clone(), account.clone());
@@ -737,6 +814,7 @@ impl AppState {
                         connected: false,
                         balance: 0.0, equity: 0.0,
                         currency: "USD".into(),
+                        last_seen: 0,
                         password: None,
                     };
                     let id = account.id.clone();
@@ -752,4 +830,24 @@ impl AppState {
             }
         });
     }
+}
+
+/// 按品种符号推断 1 标手的合约大小（报价货币单位）。
+/// 外汇直盘/交叉盘按 100000；黄金 XAU 100 盎司、白银 XAG 5000 盎司；
+/// 加密货币与指数按 1（直接以价格波动计损益）。用于浮亏估算。
+fn contract_size_for(symbol: &str) -> f64 {
+    let s = symbol.to_ascii_uppercase();
+    if s.contains("XAU") || s.contains("GOLD") { return 100.0; }
+    if s.contains("XAG") || s.contains("SILVER") { return 5000.0; }
+    if s.contains("BTC") || s.contains("ETH") || s.contains("XRP")
+        || s.contains("LTC") || s.contains("BCH") || s.contains("DOGE")
+        || s.contains("SOL") || s.contains("ADA") || s.contains("USDT")
+        || s.contains("USD1") || s.contains("CRYPTO") { return 1.0; }
+    if s.contains("US30") || s.contains("NAS") || s.contains("SPX")
+        || s.contains("US500") || s.contains("USTEC") || s.contains("UK100")
+        || s.contains("GER30") || s.contains("DAX") || s.contains("JP225")
+        || s.contains("NIKKEI") || s.contains("AUS200") || s.contains("ESP35")
+        || s.contains("FRA40") || s.contains("EUSTX") || s.contains("HK50")
+        || s.contains("CH50") || s.contains("VIX") { return 1.0; }
+    100_000.0
 }
