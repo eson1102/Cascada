@@ -640,13 +640,14 @@ fn build_order_comment(rule: &CopyRule, t: &Trade) -> String {
 
 fn expand_template(template: &str, t: &Trade) -> String {
     let src_lot = format_lot(t.volume);
-    let side = if matches!(t.side, Side::Buy) { "Buy" } else { "Sell" };
+    let side: &str = if matches!(t.side, Side::Buy) { "买入" } else { "卖出" };
     // Case-insensitive placeholder scan — replace {key} and {KEY}.
     let mut s = template.to_string();
     for (lo, hi, val) in [
         ("{symbol}", "{SYMBOL}", t.symbol.as_str()),
         ("{side}", "{SIDE}", side),
         ("{src_lot}", "{SRC_LOT}", src_lot.as_str()),
+        ("{ticket}", "{TICKET}", t.ticket.as_str()),
     ] {
         s = s.replace(lo, val).replace(hi, val);
     }

@@ -69,6 +69,7 @@ fn main() {
             commands::upsert_rule,
             commands::delete_rule,
             commands::resync_rule,
+            commands::close_rule_positions,
             commands::list_trades,
             commands::export_settings,
             commands::import_settings,

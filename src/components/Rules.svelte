@@ -135,6 +135,28 @@
     }
   }
 
+  // 清仓：平掉该规则产生的全部跟单持仓（并取消未成交挂单）。
+  let closingId: string | null = null;
+  async function closePositions(r: CopyRule) {
+    if (closingId) return;
+    const name = r.name?.trim() || "此规则";
+    const ok = await ask(
+      `清仓“${name}”？\n\n将平掉该规则产生的全部跟单持仓，并取消未成交的挂单。此操作不可撤销。`,
+      { title: "确认清仓", kind: "warning", okLabel: "清仓", cancelLabel: "取消" });
+    if (!ok) return;
+    closingId = r.id;
+    try {
+      const msg = await api.closeRulePositions(r.id);
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(msg, { title: "清仓", kind: "info", okLabel: "好" });
+    } catch (e) {
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(String(e), { title: "清仓失败", kind: "error", okLabel: "好" });
+    } finally {
+      closingId = null;
+    }
+  }
+
   function csvBind(arr: string[]): string { return arr.join(", "); }
   function fromCsv(s: string): string[] {
     return s.split(",").map((x) => x.trim()).filter(Boolean);
@@ -315,6 +337,12 @@
                     disabled={resyncingId !== null} on:click={() => resync(r)}>
               <span class="resync-dot"></span>
               <span>{resyncingId === r.id ? "补单中…" : "补单"}</span>
+            </button>
+            <button class="close-btn" class:busy={closingId === r.id}
+                    title="清仓：平掉该规则产生的全部跟单持仓"
+                    disabled={closingId !== null} on:click={() => closePositions(r)}>
+              <span class="close-dot"></span>
+              <span>{closingId === r.id ? "清仓中…" : "清仓"}</span>
             </button>
             <button class="icon-btn danger" title="删除规则" on:click={() => remove(r)}>✕</button>
           </div>
@@ -708,7 +736,7 @@
               <label class="f-label" for="order-comment">备注内容</label>
               <input id="order-comment" type="text" placeholder="例如 Copy from &#123;symbol&#125; &#123;src_lot&#125;" bind:value={editing.order_comment} />
               <p class="f-help">
-                支持占位符：<code>&#123;symbol&#125;</code>（信号端品种）、<code>&#123;side&#125;</code>（买入/卖出）、<code>&#123;src_lot&#125;</code>（信号端原始手数）。
+                支持占位符（可自由组合）：<code>&#123;symbol&#125;</code>（信号端品种）、<code>&#123;side&#125;</code>（买入/卖出）、<code>&#123;src_lot&#125;</code>（信号端原始手数）、<code>&#123;ticket&#125;</code>（订单编号）。
               </p>
             </div>
           </div>
@@ -1048,6 +1076,25 @@
     transition: background 0.12s ease;
   }
   .edit-btn:hover { background: var(--primary-soft); }
+
+  /* 清仓：与补单同款胶囊，警示（橙）主题 */
+  .close-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--warning);
+    border-radius: 999px;
+    background: transparent;
+    font-size: 12px; font-weight: 600;
+    color: #b45309;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .close-btn:hover { background: rgba(245, 158, 11, 0.12); }
+  .close-btn.busy, .close-btn:disabled { opacity: 0.6; cursor: progress; }
+  .close-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: currentColor;
+  }
 
   /* Drawer */
   .overlay {

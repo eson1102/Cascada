@@ -34,6 +34,12 @@ pub async fn resync_rule(state: S<'_>, id: String) -> Result<String, String> {
     state.resync_rule(&id).await
 }
 
+/// 清仓：平掉该规则产生的全部跟单持仓（并取消未成交挂单）。
+#[tauri::command]
+pub async fn close_rule_positions(state: S<'_>, id: String) -> Result<String, String> {
+    state.close_rule_positions(&id).await
+}
+
 #[tauri::command]
 pub async fn list_trades(state: S<'_>) -> Result<Vec<Arc<Trade>>, String> {
     Ok(state.trades.read().iter().cloned().collect())

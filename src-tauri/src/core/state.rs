@@ -480,6 +480,31 @@ impl AppState {
         Ok(format!("已请求补单（信号端 {} 的持仓将重新同步）", master_id))
     }
 
+    /// 清仓：平掉该规则产生的全部跟单持仓（并取消未成交挂单）。
+    pub async fn close_rule_positions(self: &Arc<Self>, rule_id: &str) -> Result<String, String> {
+        let rule = self.rules.read().iter()
+            .find(|r| r.id == rule_id).cloned()
+            .ok_or_else(|| "找不到该规则".to_string())?;
+        let mut closed = 0usize;
+        for s in self.ticket_map.slaves_for_rule(rule_id) {
+            if let Some(h) = self.connectors.get(&s.account_id) {
+                if h.send(ConnectorCmd::Close { ticket: s.ticket.clone() }).await.is_ok() {
+                    closed += 1;
+                }
+            }
+        }
+        let mut cancelled = 0usize;
+        for (acc, origin) in self.ticket_map.pendings_for_rule(rule_id) {
+            if let Some(h) = self.connectors.get(&acc) {
+                if h.send(ConnectorCmd::CancelPending { ticket: origin.clone() }).await.is_ok() {
+                    cancelled += 1;
+                }
+            }
+        }
+        Ok(format!("已发出平仓 {} 笔、取消挂单 {} 笔（规则：{}）",
+            closed, cancelled, rule.name))
+    }
+
     /// Look up an MT account by (platform, login) or create one on the fly.
     /// Used by the MT multiplexer when an EA dials in with an unknown login.
     pub async fn find_or_create_mt_account(

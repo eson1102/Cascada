@@ -129,6 +129,32 @@ impl TicketMap {
         String::new()
     }
 
+    /// All slave positions produced by `rule_id` (across every master).
+    /// Used by the per-rule 清仓 button to close the rule's holdings.
+    pub fn slaves_for_rule(&self, rule_id: &str) -> Vec<SlaveRef> {
+        let mut out = Vec::new();
+        for entry in self.by_master.iter() {
+            for s in entry.value().iter() {
+                if s.rule_id == rule_id {
+                    out.push(s.clone());
+                }
+            }
+        }
+        out
+    }
+
+    /// Pending (unfilled) slave orders created by `rule_id`, as
+    /// (slave_account, origin_ticket) pairs. 清仓 also cancels these.
+    pub fn pendings_for_rule(&self, rule_id: &str) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        for entry in self.pending.iter() {
+            if entry.value().1 == rule_id {
+                out.push(entry.key().clone());
+            }
+        }
+        out
+    }
+
     pub fn clear(&self) {
         self.by_master.clear();
         self.pending.clear();

@@ -57,7 +57,8 @@ void CreateStatusLabel()
       ObjectSetInteger(0, g_status_name, OBJPROP_HIDDEN, true);
       ObjectSetInteger(0, g_status_name, OBJPROP_ZORDER, 0);
       ObjectSetInteger(0, g_status_name, OBJPROP_FONTSIZE, 11);
-      ObjectSetInteger(0, g_status_name, OBJPROP_BOLD, true);
+      // MT5 has no OBJPROP_BOLD (MT4-only) — use a bold font family instead.
+      ObjectSetString(0, g_status_name, OBJPROP_FONT, "Arial Bold");
       ObjectSetInteger(0, g_status_name, OBJPROP_BACK, true);
       ObjectSetInteger(0, g_status_name, OBJPROP_BGCOLOR, C'18,22,30');
    }
