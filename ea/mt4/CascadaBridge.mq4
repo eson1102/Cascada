@@ -46,7 +46,7 @@ void CreateStatusLabel()
       ObjectSet(g_status_name, OBJPROP_SELECTABLE, false);
       ObjectSet(g_status_name, OBJPROP_HIDDEN, true);
       ObjectSet(g_status_name, OBJPROP_FONTSIZE, 11);
-      ObjectSet(g_status_name, OBJPROP_BOLD, true);
+      // 老版本 MetaEditor 无 OBJPROP_BOLD 常量 —— 用粗体字体族替代
       ObjectSet(g_status_name, OBJPROP_BACK, true);
       ObjectSet(g_status_name, OBJPROP_BGCOLOR, C'18,22,30');
    }
@@ -72,7 +72,7 @@ void UpdateStatusLabel()
       txt += "  ○ 未连接";
    }
    txt += "  持仓 " + IntegerToString(OrdersTotal());
-   ObjectSetText(g_status_name, txt, 11, "Arial", txt_color);
+   ObjectSetText(g_status_name, txt, 11, "Arial Bold", txt_color);
    ObjectSet(g_status_name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
 }
 
