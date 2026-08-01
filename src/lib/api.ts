@@ -182,6 +182,10 @@ export interface Trade {
   profit: number | null;
   /** Broker-reported pip size. 0/undefined on pre-v0.1.6 EAs. */
   pip_size?: number;
+  /** 信号端原始单号（从订单备注解析）。 */
+  origin_ticket?: string | null;
+  /** 产生该跟单订单的规则 ID（统计页按规则分组用），空 = 未关联。 */
+  rule_id?: string;
 }
 
 export interface LogEntry {

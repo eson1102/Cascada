@@ -114,6 +114,21 @@ impl TicketMap {
         self.by_master.remove(master);
     }
 
+    /// Reverse lookup: which rule produced the slave order
+    /// `(account_id, ticket)`? Returns "" when unknown (e.g. historical
+    /// orders replayed before this session built the map). Used to tag
+    /// trade records so the statistics page can group by rule.
+    pub fn rule_for_slave(&self, account_id: &str, ticket: &str) -> String {
+        for entry in self.by_master.iter() {
+            for s in entry.value().iter() {
+                if s.account_id == account_id && s.ticket == ticket {
+                    return s.rule_id.clone();
+                }
+            }
+        }
+        String::new()
+    }
+
     pub fn clear(&self) {
         self.by_master.clear();
         self.pending.clear();

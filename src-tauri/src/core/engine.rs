@@ -388,6 +388,7 @@ fn pending_as_trade(p: &PendingOrder) -> Trade {
         feed: p.feed.clone(),
         magic: p.magic,
         resync: false,
+        rule_id: String::new(),
     }
 }
 

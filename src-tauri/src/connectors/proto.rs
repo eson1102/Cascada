@@ -213,6 +213,7 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 opened_at: ts, closed_at: None, profit: None,
                 origin_ticket: (!origin.is_empty()).then_some(origin),
                 comment, pip_size, feed, magic, resync,
+                rule_id: String::new(),
             })); },
         S2C::Close { ticket, profit, ts, .. } =>
             { let _ = events.send(ConnectorEvent::TradeClosed {
@@ -225,7 +226,7 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 sl: opt(sl), tp: opt(tp),
                 opened_at: 0, closed_at: None, profit: None,
                 origin_ticket: None, comment: String::new(), pip_size: 0.0,
-                feed: String::new(), magic: 0, resync: false,
+                feed: String::new(), magic: 0, resync: false, rule_id: String::new(),
             })); },
         S2C::Pending { ticket, symbol, side, order_type, volume, target, sl, tp,
                        expiry, origin, comment, pip_size, feed, magic } => {
@@ -274,7 +275,7 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 opened_at, closed_at: Some(closed_at), profit: Some(profit),
                 origin_ticket: (!origin.is_empty()).then_some(origin),
                 comment: String::new(), pip_size: 0.0,
-                feed: String::new(), magic: 0, resync: false,
+                feed: String::new(), magic: 0, resync: false, rule_id: String::new(),
             })); },
         S2C::HistoryDone { count } =>
             emit_log(events, id, LogLevel::Info, format!("history snapshot: {count} trades")),

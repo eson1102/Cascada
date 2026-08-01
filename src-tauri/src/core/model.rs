@@ -231,6 +231,12 @@ pub struct Trade {
     /// can be back-filled.
     #[serde(default)]
     pub resync: bool,
+    /// ID of the CopyRule that produced this slave order — resolved by the
+    /// state layer via the ticket map on open. Empty for orders that
+    /// aren't tied to a rule (or historical replays). Used by the
+    /// statistics page to group by rule.
+    #[serde(default)]
+    pub rule_id: String,
 }
 
 /// Kind of pending order — mirrors the master/slave broker's `OP_BUYLIMIT`

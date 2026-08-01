@@ -307,9 +307,11 @@
               <span class="toggle-label">{r.enabled ? "运行中" : "已暂停"}</span>
             </button>
             <button class="icon-btn" title="编辑规则" on:click={() => editRule(r)}>✎</button>
-            <button class="icon-btn" class:busy={resyncingId === r.id} title="补单：补上信号端持仓中缺失的跟单订单（忽略跟单时效）"
+            <button class="resync-btn" class:busy={resyncingId === r.id}
+                    title="补单：补上信号端持仓中缺失的跟单订单（忽略跟单时效）"
                     disabled={resyncingId !== null} on:click={() => resync(r)}>
-              {resyncingId === r.id ? "…" : "补"}
+              <span class="resync-dot"></span>
+              <span>{resyncingId === r.id ? "补单中…" : "补单"}</span>
             </button>
             <button class="icon-btn danger" title="删除规则" on:click={() => remove(r)}>✕</button>
           </div>
@@ -1010,6 +1012,25 @@
   .toggle.on { border-color: #10b981; background: #ecfdf5; color: #047857; }
   .toggle.on .toggle-track { background: #10b981; }
   .toggle.on .toggle-thumb { left: 14px; }
+
+  /* 补单：与运行中同款的胶囊按钮，红色主题 */
+  .resync-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--danger);
+    border-radius: 999px;
+    background: transparent;
+    font-size: 12px; font-weight: 600;
+    color: var(--danger);
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .resync-btn:hover { background: rgba(239, 68, 68, 0.1); }
+  .resync-btn.busy, .resync-btn:disabled { opacity: 0.6; cursor: progress; }
+  .resync-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: currentColor;
+  }
 
   /* Drawer */
   .overlay {

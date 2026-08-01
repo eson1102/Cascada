@@ -274,15 +274,11 @@ impl AppState {
                     changed
                 });
             }
-            ConnectorEvent::TradeOpened(t) => {
-                let t = Arc::new(t);
-                {
-                    let mut trades = self.trades.write();
-                    trades.push_front(Arc::clone(&t));
-                    if trades.len() > TRADE_BUFFER_CAP { trades.pop_back(); }
-                }
-                self.emit_trade(&t);
-
+            ConnectorEvent::TradeOpened(mut t) => {
+                // Tag the record with its rule (statistics grouping). Try the
+                // existing map first (already-confirmed mirrors), then the
+                // pending entry consumed by resolve_slave_open below.
+                let mut rule_id = self.ticket_map.rule_for_slave(&t.account_id, &t.ticket);
                 let is_mirror = t.origin_ticket.as_deref().map_or(false, |origin| {
                     let matched = self.ticket_map.resolve_slave_open(
                         &t.account_id, origin, &t.ticket,
@@ -293,6 +289,17 @@ impl AppState {
                     }
                     matched
                 });
+                if is_mirror && rule_id.is_empty() {
+                    rule_id = self.ticket_map.rule_for_slave(&t.account_id, &t.ticket);
+                }
+                if !rule_id.is_empty() { t.rule_id = rule_id; }
+                let t = Arc::new(t);
+                {
+                    let mut trades = self.trades.write();
+                    trades.push_front(Arc::clone(&t));
+                    if trades.len() > TRADE_BUFFER_CAP { trades.pop_back(); }
+                }
+                self.emit_trade(&t);
                 // A master TradeOpened whose ticket already has slave mappings
                 // is the position born from a pending we already mirrored
                 // (ticket_map was migrated by PendingFilled). Skip the engine
@@ -317,6 +324,7 @@ impl AppState {
                     opened_at: ts, closed_at: Some(ts), profit,
                     origin_ticket: None, comment: String::new(), pip_size: 0.0,
                     feed: String::new(), magic: 0, resync: false,
+                    rule_id: String::new(),
                 };
                 self.emit_trade(&t);
                 engine.on_trade_closed(&account_id, &ticket).await;
