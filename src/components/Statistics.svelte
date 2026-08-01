@@ -12,7 +12,23 @@
     return r ? (r.name?.trim() || "未命名规则") : "已删除的规则";
   };
 
-  $: filtered = trades.filter((t) => {
+  // ---- 防抖快照 ----
+  // App 层在交易/心跳活跃时会高频替换 trades 数组（rAF flush）。
+  // 直接驱动全部 reactive 会让统计页在历史重放时每帧全量重算+重渲染
+  // 明细表，主线程被阻塞 → 页面假死。改为等待 150ms 静默后再快照。
+  let snapshot: Trade[] = [];
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  $: sync(trades);
+  function sync(t: Trade[]) {
+    if (t === snapshot) return;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      snapshot = t;
+      debounceTimer = undefined;
+    }, 150);
+  }
+
+  $: filtered = snapshot.filter((t) => {
     if (selectedRule === "all") return true;
     if (selectedRule === "none") return !t.rule_id;
     return t.rule_id === selectedRule;
@@ -171,6 +187,7 @@
     {#if monthDetail.length === 0}
       <p class="muted empty-tip">该月没有符合条件的订单。</p>
     {:else}
+      {@const shown = monthDetail.slice(0, 100)}
       <table class="tbl">
         <thead>
           <tr>
@@ -179,7 +196,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each monthDetail as t}
+          {#each shown as t}
             <tr>
               <td class="muted">{fmtTime(t.opened_at)}</td>
               <td>{t.rule_id ? ruleName(t.rule_id) : "—"}</td>
@@ -192,6 +209,9 @@
           {/each}
         </tbody>
       </table>
+      {#if monthDetail.length > 100}
+        <p class="muted empty-tip">仅显示最近 100 条（当月共 {monthDetail.length} 条）</p>
+      {/if}
     {/if}
   </div>
 </div>

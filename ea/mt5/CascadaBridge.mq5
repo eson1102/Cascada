@@ -38,6 +38,55 @@ const int FFLAGS_RW  = FILE_READ|FILE_WRITE|FILE_BIN|FILE_COMMON|FILE_SHARE_READ
 const int FFLAGS_W   = FILE_WRITE|FILE_BIN|FILE_COMMON|FILE_SHARE_READ|FILE_SHARE_WRITE;
 const int FFLAGS_R   = FILE_READ|FILE_BIN|FILE_COMMON|FILE_SHARE_READ|FILE_SHARE_WRITE;
 
+// ---- 图表运行状态标注 ----
+string g_status_name = "CascadaStatusLabel";
+bool   g_connected   = false;
+long   g_last_cmd_ms = 0;
+long   g_last_status_update = 0;
+const string g_ea_ver = "v0.9.5";
+
+void CreateStatusLabel()
+{
+   if(ObjectFind(0, g_status_name) < 0)
+   {
+      ObjectCreate(0, g_status_name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, g_status_name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+      ObjectSetInteger(0, g_status_name, OBJPROP_XDISTANCE, 10);
+      ObjectSetInteger(0, g_status_name, OBJPROP_YDISTANCE, 10);
+      ObjectSetInteger(0, g_status_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, g_status_name, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, g_status_name, OBJPROP_ZORDER, 0);
+      ObjectSetInteger(0, g_status_name, OBJPROP_FONTSIZE, 11);
+      ObjectSetInteger(0, g_status_name, OBJPROP_BOLD, true);
+      ObjectSetInteger(0, g_status_name, OBJPROP_BACK, true);
+      ObjectSetInteger(0, g_status_name, OBJPROP_BGCOLOR, C'18,22,30');
+   }
+}
+
+void UpdateStatusLabel()
+{
+   long now_ms = (long)TimeCurrent() * 1000;
+   // 节流：最多每 2 秒重绘一次，避免高频 tick 闪烁
+   if(now_ms - g_last_status_update < 2000 && g_last_status_update > 0) return;
+   g_last_status_update = now_ms;
+
+   string txt = "青山跟单 " + g_ea_ver;
+   if(g_connected)
+   {
+      long since = (now_ms - g_last_cmd_ms) / 1000;
+      txt += (since <= 30 ? "  ● 运行中" : "  ● 已连接（空闲）");
+      ObjectSetInteger(0, g_status_name, OBJPROP_COLOR, clrLime);
+   }
+   else
+   {
+      txt += "  ○ 未连接";
+      ObjectSetInteger(0, g_status_name, OBJPROP_COLOR, clrTomato);
+   }
+   txt += "  持仓 " + IntegerToString(PositionsTotal());
+   ObjectSetString(0, g_status_name, OBJPROP_TEXT, txt);
+   ObjectSetInteger(0, g_status_name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+}
+
 //+------------------------------------------------------------------+
 int OnInit()
 {
@@ -68,6 +117,8 @@ int OnInit()
    trade.SetAsyncMode(false);
    EventSetMillisecondTimer(PollMs);
 
+   CreateStatusLabel();
+   UpdateStatusLabel();
    WriteWelcome();
    SnapshotAll();
    return INIT_SUCCEEDED;
@@ -77,6 +128,7 @@ void OnDeinit(const int reason)
 {
    EventKillTimer();
    if(g_evt_h != INVALID_HANDLE) { FileClose(g_evt_h); g_evt_h = INVALID_HANDLE; }
+   ObjectDelete(0, g_status_name);
 }
 
 //+------------------------------------------------------------------+
@@ -86,6 +138,7 @@ void OnTimer()
    SyncPendings();
    PushHeartbeat();
    PushQuotes();
+   UpdateStatusLabel();
 }
 
 //+------------------------------------------------------------------+
@@ -617,6 +670,8 @@ void PumpCommands()
 
 void HandleCommand(const string line)
 {
+   g_connected   = true;
+   g_last_cmd_ms = (long)TimeCurrent() * 1000;
    string op = JsonField(line, "op");
    if(op == "")                    return;
    else if(op == "open")           DoOpenMarket(line);

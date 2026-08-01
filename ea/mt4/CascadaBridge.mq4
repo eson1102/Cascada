@@ -28,6 +28,54 @@ const int FFLAGS_RW = FILE_READ|FILE_WRITE|FILE_BIN|FILE_COMMON|FILE_SHARE_READ|
 const int FFLAGS_W  = FILE_WRITE|FILE_BIN|FILE_COMMON|FILE_SHARE_READ|FILE_SHARE_WRITE;
 const int FFLAGS_R  = FILE_READ|FILE_BIN|FILE_COMMON|FILE_SHARE_READ|FILE_SHARE_WRITE;
 
+// ---- 图表运行状态标注 ----
+string g_status_name = "CascadaStatusLabel";
+bool   g_connected   = false;
+int    g_last_cmd_ts = 0;
+int    g_last_status_update = 0;
+const string g_ea_ver = "v0.9.5";
+
+void CreateStatusLabel()
+{
+   if(ObjectFind(0, g_status_name) < 0)
+   {
+      ObjectCreate(0, g_status_name, OBJ_LABEL, 0, 0, 0);
+      ObjectSet(g_status_name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+      ObjectSet(g_status_name, OBJPROP_XDISTANCE, 10);
+      ObjectSet(g_status_name, OBJPROP_YDISTANCE, 10);
+      ObjectSet(g_status_name, OBJPROP_SELECTABLE, false);
+      ObjectSet(g_status_name, OBJPROP_HIDDEN, true);
+      ObjectSet(g_status_name, OBJPROP_FONTSIZE, 11);
+      ObjectSet(g_status_name, OBJPROP_BOLD, true);
+      ObjectSet(g_status_name, OBJPROP_BACK, true);
+      ObjectSet(g_status_name, OBJPROP_BGCOLOR, C'18,22,30');
+   }
+}
+
+void UpdateStatusLabel()
+{
+   int now = (int)TimeCurrent();
+   // 节流：最多每 2 秒重绘一次
+   if(now - g_last_status_update < 2 && g_last_status_update > 0) return;
+   g_last_status_update = now;
+
+   string txt = "青山跟单 " + g_ea_ver;
+   color txt_color = clrTomato;
+   if(g_connected)
+   {
+      int since = now - g_last_cmd_ts;
+      txt += (since <= 30 ? "  ● 运行中" : "  ● 已连接（空闲）");
+      txt_color = clrLime;
+   }
+   else
+   {
+      txt += "  ○ 未连接";
+   }
+   txt += "  持仓 " + IntegerToString(OrdersTotal());
+   ObjectSetText(g_status_name, txt, 11, "Arial", txt_color);
+   ObjectSet(g_status_name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+}
+
 //+------------------------------------------------------------------+
 int OnInit()
 {
@@ -53,6 +101,8 @@ int OnInit()
    if(ch != INVALID_HANDLE) { g_cmd_off = (ulong)FileSize(ch); FileClose(ch); }
 
    EventSetMillisecondTimer(PollMs);
+   CreateStatusLabel();
+   UpdateStatusLabel();
    WriteWelcome();
    SnapshotAll();
    return INIT_SUCCEEDED;
@@ -62,6 +112,7 @@ void OnDeinit(const int reason)
 {
    EventKillTimer();
    if(g_evt_h != INVALID_HANDLE) { FileClose(g_evt_h); g_evt_h = INVALID_HANDLE; }
+   ObjectDelete(g_status_name);
 }
 
 void OnTimer()
@@ -70,6 +121,7 @@ void OnTimer()
    PushHeartbeat();
    SyncOrderState();
    PushQuotes();
+   UpdateStatusLabel();
 }
 
 //+------------------------------------------------------------------+
@@ -455,6 +507,8 @@ void PumpCommands()
 
 void HandleCommand(const string line)
 {
+   g_connected   = true;
+   g_last_cmd_ts = (int)TimeCurrent();
    string op = JsonField(line, "op");
    if(op == "")                    return;
    else if(op == "open")           DoOpenMarket(line);

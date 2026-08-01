@@ -306,7 +306,10 @@
               <span class="toggle-track"><span class="toggle-thumb"></span></span>
               <span class="toggle-label">{r.enabled ? "运行中" : "已暂停"}</span>
             </button>
-            <button class="icon-btn" title="编辑规则" on:click={() => editRule(r)}>✎</button>
+            <button class="edit-btn" title="编辑规则" on:click={() => editRule(r)}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <span>编辑</span>
+            </button>
             <button class="resync-btn" class:busy={resyncingId === r.id}
                     title="补单：补上信号端持仓中缺失的跟单订单（忽略跟单时效）"
                     disabled={resyncingId !== null} on:click={() => resync(r)}>
@@ -1031,6 +1034,20 @@
     width: 8px; height: 8px; border-radius: 50%;
     background: currentColor;
   }
+
+  /* 编辑：与补单同款胶囊，主色（蓝）主题 */
+  .edit-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--primary);
+    border-radius: 999px;
+    background: transparent;
+    font-size: 12px; font-weight: 600;
+    color: var(--primary);
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .edit-btn:hover { background: var(--primary-soft); }
 
   /* Drawer */
   .overlay {
