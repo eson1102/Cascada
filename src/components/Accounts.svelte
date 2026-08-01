@@ -443,7 +443,8 @@
   .row:first-child { border-top: none; }
   .row.master {
     background: var(--surface-muted);
-    grid-template-columns: auto auto 1fr auto auto auto auto;
+    /* 8 列：徽章 · 平台 · 名称(1fr) · 状态 · 心跳 · 余额 · 净值 · 操作 */
+    grid-template-columns: auto auto 1fr auto auto auto auto auto;
     border-top: none;
   }
   .row.slave {
@@ -574,7 +575,8 @@
     50%      { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.08); }
   }
 
-  .row-actions { display: inline-flex; gap: 6px; justify-content: flex-end; }
+  .row-actions { display: inline-flex; gap: 6px; justify-content: flex-end; flex-wrap: nowrap; }
+  .row-actions button { white-space: nowrap; }
   .row-actions.wrap { flex-wrap: wrap; max-width: 100%; }
 
   .children { display: flex; flex-direction: column; }

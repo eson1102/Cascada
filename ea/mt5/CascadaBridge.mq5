@@ -465,6 +465,7 @@ void WriteOpen(ulong ticket, bool resync = false)
       ",\"tp\":"         + F5(PositionGetDouble(POSITION_TP)) +
       ",\"commission\":" + F5(EntryCommission(ticket)) +
       ",\"swap\":"       + F5(PositionGetDouble(POSITION_SWAP)) +
+      ",\"unrealized\":" + F5(PositionGetDouble(POSITION_PROFIT)) +
       ",\"pip_size\":"   + F5(PipSize(sym)) +
       ",\"comment\":\""  + Esc(cmt) + "\"" +
       ",\"origin\":\""   + Esc(origin) + "\"" +
@@ -943,9 +944,24 @@ void PushQuotes()
          ",\"bid\":"      + F5(tick.bid) +
          ",\"ask\":"      + F5(tick.ask) +
          ",\"pip_size\":" + F5(PipSize(sym)) +
+         ",\"unrealized\":" + F5(SymbolUnrealizedProfit(sym)) +
          ",\"ts\":"       + IntegerToString(now);
       WriteEvent("quote", body);
    }
+}
+
+// 该品种全部持仓的浮动盈亏（账户货币）——用于浮亏监控。
+double SymbolUnrealizedProfit(const string sym)
+{
+   double total = 0.0;
+   for(int i = 0; i < PositionsTotal(); i++)
+   {
+      ulong pt = PositionGetTicket(i);
+      if(pt == 0) continue;
+      if(PositionGetString(POSITION_SYMBOL) != sym) continue;
+      total += PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+   }
+   return total;
 }
 
 //+------------------------------------------------------------------+

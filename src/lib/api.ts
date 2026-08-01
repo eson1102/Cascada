@@ -140,6 +140,8 @@ export interface Quote {
   ask: number;
   /// Broker-reported pip size. 0/undefined when the EA hasn't been upgraded.
   pip_size?: number;
+  /// EA-reported unrealised P&L (account currency) for all positions on this symbol.
+  unrealized?: number;
   ts: number;
 }
 

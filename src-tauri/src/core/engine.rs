@@ -483,6 +483,7 @@ fn pending_as_trade(p: &PendingOrder) -> Trade {
         origin_ticket: p.origin_ticket.clone(),
         comment: p.comment.clone(),
         pip_size: p.pip_size,
+        unrealized: None,
         feed: p.feed.clone(),
         magic: p.magic,
         resync: false,

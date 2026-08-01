@@ -191,6 +191,8 @@ pub enum S2C {
         bid: f64,
         ask: f64,
         #[serde(default)] pip_size: f64,
+        /// EA-reported unrealised P&L for all positions on this symbol.
+        #[serde(default)] unrealized: Option<f64>,
         #[serde(default)] ts: i64,
     },
     Symbols { symbols: Vec<String> },
@@ -212,7 +214,7 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 sl: opt(sl), tp: opt(tp),
                 opened_at: ts, closed_at: None, profit: None,
                 origin_ticket: (!origin.is_empty()).then_some(origin),
-                comment, pip_size, feed, magic, resync,
+                comment, pip_size, unrealized: None, feed, magic, resync,
                 rule_id: String::new(),
             })); },
         S2C::Close { ticket, profit, ts, .. } =>
@@ -225,7 +227,7 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 symbol: String::new(), side: Side::Buy, volume: 0.0, price: 0.0,
                 sl: opt(sl), tp: opt(tp),
                 opened_at: 0, closed_at: None, profit: None,
-                origin_ticket: None, comment: String::new(), pip_size: 0.0,
+                origin_ticket: None, comment: String::new(), pip_size: 0.0, unrealized: None,
                 feed: String::new(), magic: 0, resync: false, rule_id: String::new(),
             })); },
         S2C::Pending { ticket, symbol, side, order_type, volume, target, sl, tp,
@@ -274,16 +276,17 @@ pub fn dispatch(account: &Account, msg: S2C, events: &mpsc::UnboundedSender<Conn
                 sl: None, tp: None,
                 opened_at, closed_at: Some(closed_at), profit: Some(profit),
                 origin_ticket: (!origin.is_empty()).then_some(origin),
-                comment: String::new(), pip_size: 0.0,
+                comment: String::new(), pip_size: 0.0, unrealized: None,
                 feed: String::new(), magic: 0, resync: false, rule_id: String::new(),
             })); },
         S2C::HistoryDone { count } =>
             emit_log(events, id, LogLevel::Info, format!("history snapshot: {count} trades")),
         S2C::Pong { .. } => {}
         S2C::Log { level, message } => emit_log(events, id, level, message),
-        S2C::Quote { symbol, bid, ask, pip_size, ts } => {
+        S2C::Quote { symbol, bid, ask, pip_size, unrealized, ts } => {
             let _ = events.send(ConnectorEvent::Quote(Quote {
                 account_id: id.clone(), symbol, bid, ask, pip_size,
+                unrealized,
                 ts: if ts > 0 { ts } else { chrono::Utc::now().timestamp_millis() },
             }));
         }

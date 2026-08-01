@@ -368,7 +368,7 @@ impl AppState {
                     symbol: String::new(), side: Side::Buy, volume: 0.0, price: 0.0,
                     sl: None, tp: None,
                     opened_at: ts, closed_at: Some(ts), profit,
-                    origin_ticket: None, comment: String::new(), pip_size: 0.0,
+                    origin_ticket: None, comment: String::new(), pip_size: 0.0, unrealized: None,
                     feed: String::new(), magic: 0, resync: false,
                     rule_id: String::new(),
                 };
@@ -631,20 +631,30 @@ impl AppState {
         }
     }
 
-    /// 估算该规则下全部 slave 持仓的浮亏（USD）。用 EA 上报的 quote；
-    /// 合约大小按品种启发式推断（外汇 100000 / 黄金 100oz / 白银 5000oz /
-    /// 加密 1 / 指数 1），避免对非外汇品种误判。
+    /// 估算该规则下全部 slave 持仓的浮亏（账户货币）。
+    /// 优先用 EA 上报的 quote.unrealized（该品种全部持仓的浮动盈亏，
+    /// 100 就是 100，无需合约估算）；新版 EA 未上报时回退到
+    /// 差价 × 合约大小启发式（旧 EA 的近似）。
     fn rule_floating_loss(&self, rule: &CopyRule) -> Option<f64> {
         let slaves = self.ticket_map.slaves_for_rule(&rule.id);
         if slaves.is_empty() { return Some(0.0); }
         let trades = self.trades.read();
         let mut total = 0.0_f64;
+        // 收集 (account, symbol) 去重集合 —— EA 报的是符号级浮亏
+        let mut seen = std::collections::HashSet::new();
         for s in &slaves {
             let t = trades.iter().find(|t| t.ticket == s.ticket
                 && t.account_id == s.account_id).cloned();
             let Some(t) = t else { continue; };
+            if !seen.insert((s.account_id.clone(), t.symbol.clone())) { continue; }
             let q = self.quotes.get(&(s.account_id.clone(), t.symbol.clone())).map(|v| v.value().clone());
             let Some(q) = q else { continue; };
+            // 优先：EA 上报的符号级浮亏（账户货币，直接相加）
+            if let Some(u) = q.unrealized {
+                if u < 0.0 { total += -u; }
+                continue;
+            }
+            // 回退：差价 × 合约大小启发式
             let units = (t.volume * contract_size_for(&t.symbol)).max(0.0);
             let is_buy = matches!(t.side, Side::Buy);
             let current = if is_buy { q.bid } else { q.ask };

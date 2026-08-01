@@ -203,6 +203,11 @@ pub struct Quote {
     /// frontend falls back to a symbol-name heuristic in that case.
     #[serde(default)]
     pub pip_size: f64,
+    /// EA-reported unrealised P&L (account currency) for ALL positions on
+    /// this symbol. Used by the floating-loss watchdog — "100" means
+    /// exactly 100 in the account currency, no contract-size estimation.
+    #[serde(default)]
+    pub unrealized: Option<f64>,
     pub ts: i64,
 }
 
@@ -219,6 +224,12 @@ pub struct Trade {
     pub opened_at: i64,
     pub closed_at: Option<i64>,
     pub profit: Option<f64>,
+    /// Broker-reported unrealised P&L (account currency) for an open
+    /// position, carried on open/modify events. Used by the floating-loss
+    /// watchdog so "100" means exactly 100 in the account currency —
+    /// no contract-size estimation involved. None = EA hasn't reported it.
+    #[serde(default)]
+    pub unrealized: Option<f64>,
     #[serde(default)]
     pub origin_ticket: Option<String>,
     #[serde(default)]

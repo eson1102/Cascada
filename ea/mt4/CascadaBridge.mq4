@@ -370,6 +370,7 @@ void WriteOpen(bool resync = false)
       ",\"tp\":"         + F5(OrderTakeProfit()) +
       ",\"commission\":" + F5(OrderCommission()) +
       ",\"swap\":"       + F5(OrderSwap()) +
+      ",\"unrealized\":" + F5(OrderProfit()) +
       ",\"pip_size\":"   + F5(PipSize(sym)) +
       ",\"comment\":\""  + Esc(cmt) + "\"" +
       ",\"origin\":\""   + Esc(origin) + "\"" +
@@ -727,9 +728,24 @@ void PushQuotes()
          ",\"bid\":"      + F5(bid) +
          ",\"ask\":"      + F5(ask) +
          ",\"pip_size\":" + F5(PipSize(sym)) +
+         ",\"unrealized\":" + F5(SymbolUnrealizedProfit(sym)) +
          ",\"ts\":"       + IntegerToString(now);
       WriteEvent("quote", body);
    }
+}
+
+// 该品种全部持仓的浮动盈亏（账户货币）——用于浮亏监控。
+double SymbolUnrealizedProfit(const string sym)
+{
+   double total = 0.0;
+   for(int i = 0; i < OrdersTotal(); i++)
+   {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+      if(OrderType() > OP_SELL) continue;         // 只算持仓，跳过挂单
+      if(OrderSymbol() != sym) continue;
+      total += OrderProfit() + OrderSwap();
+   }
+   return total;
 }
 
 //+------------------------------------------------------------------+

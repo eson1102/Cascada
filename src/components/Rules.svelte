@@ -675,12 +675,12 @@
               <p class="f-help">匹配其中任意一项的交易将被跳过。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="strip-prefix">信号端去掉前缀</label>
+              <label class="f-label" for="strip-prefix">信号端前缀</label>
               <input id="strip-prefix" type="text" placeholder="（无）" bind:value={editing.master_strip_prefix} />
               <p class="f-help">先从信号端代码中移除（不区分大小写）。</p>
             </div>
             <div class="field">
-              <label class="f-label" for="strip-suffix">信号端去掉后缀</label>
+              <label class="f-label" for="strip-suffix">信号端后缀</label>
               <input id="strip-suffix" type="text" placeholder="m" bind:value={editing.master_strip_suffix} />
               <p class="f-help">先从信号端代码中移除（不区分大小写）。</p>
             </div>
