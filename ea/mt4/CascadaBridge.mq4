@@ -825,7 +825,13 @@ void RememberOrigin(int ticket, const string origin)
          return;
       }
    }
-   if(ArraySize(g_origins) >= 500) ArrayRemove(g_origins, 0, 50); // 防无限增长
+   // MT4 无 ArrayRemove —— 手动前移丢弃最旧的 50 条，防无限增长
+   if(ArraySize(g_origins) >= 500)
+   {
+      int keep = ArraySize(g_origins) - 50;
+      for(int i = 0; i < keep; i++) g_origins[i] = g_origins[i + 50];
+      ArrayResize(g_origins, keep);
+   }
    int n = ArraySize(g_origins);
    ArrayResize(g_origins, n + 1);
    g_origins[n].ticket = ticket;
