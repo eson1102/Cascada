@@ -310,7 +310,6 @@
     }
     return { map: m, issues };
   })();
-  $: chipsByRule = new Map([...ruleMeta.map].map(([k, v]) => [k, v.chips]));
   $: issuesCount = ruleMeta.issues;
 
   const TABS: { id: TabId; label: string; icon: string; desc: string }[] = [
@@ -852,6 +851,11 @@
             写入跟单端订单的自定义备注（MT4/MT5 的 Comment、cTrader 的 Label）。留空 = 不加备注。
           </p>
           <div class="form-grid">
+            <div class="field">
+              <label class="f-label" for="slave-magic">下单魔术号</label>
+              <input id="slave-magic" type="number" min="0" step="1" placeholder="0" bind:value={editing.slave_magic} />
+              <p class="f-help">该规则在跟单端使用的 Magic Number（MT4/MT5），便于在终端中按魔术号识别本规则的订单。0 = 使用 EA 默认。</p>
+            </div>
             <div class="field full">
               <label class="f-label" for="order-comment">备注内容</label>
               <input id="order-comment" type="text" placeholder="例如 Copy from &#123;symbol&#125; &#123;src_lot&#125;" bind:value={editing.order_comment} />

@@ -40,6 +40,8 @@ export interface CopyRule {
   lot_value: number;
   reverse: boolean;
   max_slippage_pips: number;
+  /** 规则下单魔术号（跟单端订单使用此 Magic；0 = EA 默认）。 */
+  slave_magic: number;
   symbol_map: Record<string, string>;
 
   min_lot: number;
@@ -153,7 +155,7 @@ export function defaultRule(master_id = "", slave_id = ""): CopyRule {
     enabled: false,  // 默认不开启跟单，由用户手动启用
     lot_mode: "Multiplier", lot_value: 1,
     reverse: false,
-    max_slippage_pips: 3,
+    max_slippage_pips: 3, slave_magic: 0,
     symbol_map: {},
     min_lot: 0, max_lot: 0,
     master_min_lot: 0, master_max_lot: 0,

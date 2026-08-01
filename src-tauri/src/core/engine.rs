@@ -186,6 +186,7 @@ impl CopyEngine {
                 symbol, side, volume, sl, tp,
                 max_slippage_pips: rule.max_slippage_pips,
                 comment: build_order_comment(&rule, t),
+                magic: rule.slave_magic,
             };
 
             if !req.comment.is_empty() {
@@ -403,6 +404,7 @@ impl CopyEngine {
                 symbol, side, order_type: p.order_type,
                 volume, target, sl, tp, expiry: p.expiry,
                 comment: build_order_comment(&rule, &as_trade),
+                magic: rule.slave_magic,
             };
 
             self.state.ticket_map.mark_pending(

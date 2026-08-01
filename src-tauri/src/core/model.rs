@@ -97,6 +97,8 @@ pub struct CopyRule {
     pub lot_value: f64,
     pub reverse: bool,
     pub max_slippage_pips: u32,
+    /// Rule-configured magic number applied to slave orders (0 = EA default).
+    #[serde(default)] pub slave_magic: i64,
     #[serde(default)] pub symbol_map: HashMap<String, String>,
 
     // Lot constraints
@@ -332,6 +334,8 @@ pub struct OrderRequest {
     pub max_slippage_pips: u32,
     /// Custom order comment generated from the rule (empty = none).
     pub comment: String,
+    /// Rule-configured slave magic number (0 = EA default).
+    pub magic: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -348,6 +352,8 @@ pub struct PendingOrderRequest {
     pub expiry: i64,
     /// Custom order comment generated from the rule (empty = none).
     pub comment: String,
+    /// Rule-configured slave magic number (0 = EA default).
+    pub magic: i64,
 }
 
 #[derive(Debug, Clone)]

@@ -272,7 +272,7 @@
       {:else if tab === "rules"}
         <Rules bind:rules {accounts} on:refresh={refresh} />
       {:else if tab === "trades"}
-        <Trades {trades} {accounts} />
+        <Trades {trades} {accounts} {rules} />
       {:else if tab === "compare"}
         <Compare {accounts} {rules} on:refresh={refresh} />
       {:else if tab === "logs"}

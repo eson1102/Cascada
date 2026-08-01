@@ -561,6 +561,7 @@ void DoOpenMarket(const string line)
    double sl   = NormalizePrice(sym, StringToDouble(JsonField(line, "sl")));
    double tp   = NormalizePrice(sym, StringToDouble(JsonField(line, "tp")));
    int    slip = (int)StringToInteger(JsonField(line, "slippage"));
+   int    magic = (int)StringToInteger(JsonField(line, "magic"));
    string origin = JsonField(line, "ticket");
    string cmt = BuildComment(origin, JsonField(line, "comment"));
    if(vol <= 0) { WriteLog("error", "bad volume for " + sym); return; }
@@ -570,7 +571,7 @@ void DoOpenMarket(const string line)
    double price = (t == OP_BUY) ? MarketInfo(sym, MODE_ASK) : MarketInfo(sym, MODE_BID);
    double point = MarketInfo(sym, MODE_POINT);
    int    pts   = (slip > 0 && point > 0) ? (int)MathRound(slip * PipSize(sym) / point) : 10;
-   int r = OrderSend(sym, t, vol, price, pts, sl, tp, cmt, 0, 0, clrNONE);
+   int r = OrderSend(sym, t, vol, price, pts, sl, tp, cmt, magic, 0, clrNONE);
    if(r < 0) WriteLog("error", "open failed " + sym + ": " + IntegerToString(GetLastError()));
    else      RememberOrigin(r, origin);
 }
@@ -584,6 +585,7 @@ void DoOpenPending(const string line, bool is_limit)
    double sl   = NormalizePrice(sym, StringToDouble(JsonField(line, "sl")));
    double tp   = NormalizePrice(sym, StringToDouble(JsonField(line, "tp")));
    long expiry_ms = StringToInteger(JsonField(line, "expiry"));
+   int   magic = (int)StringToInteger(JsonField(line, "magic"));
    string origin = JsonField(line, "ticket");
    string cmt = BuildComment(origin, JsonField(line, "comment"));
    if(vol <= 0 || tgt <= 0) { WriteLog("error", "bad pending params for " + sym); return; }
@@ -593,7 +595,7 @@ void DoOpenPending(const string line, bool is_limit)
    if(side == "Sell") t = is_limit ? OP_SELLLIMIT : OP_SELLSTOP;
    else               t = is_limit ? OP_BUYLIMIT  : OP_BUYSTOP;
    datetime exp = (expiry_ms > 0) ? (datetime)(expiry_ms / 1000) : (datetime)0;
-   int r = OrderSend(sym, t, vol, tgt, 5, sl, tp, cmt, 0, exp, clrNONE);
+   int r = OrderSend(sym, t, vol, tgt, 5, sl, tp, cmt, magic, exp, clrNONE);
    if(r < 0) WriteLog("error", "pending failed " + sym + ": " + IntegerToString(GetLastError()));
    else      RememberOrigin(r, origin);
 }

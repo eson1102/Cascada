@@ -6,24 +6,32 @@ use crate::core::model::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
+fn is_zero(v: &i64) -> bool { *v == 0 }
+
 #[derive(Serialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum C2S<'a> {
     Open {
         ticket: &'a str, symbol: &'a str, side: Side,
         volume: f64, sl: f64, tp: f64, slippage: u32,
+        #[serde(default, skip_serializing_if = "is_zero")]
+        magic: i64,
         #[serde(skip_serializing_if = "str::is_empty")]
         comment: &'a str,
     },
     OpenLimit {
         ticket: &'a str, symbol: &'a str, side: Side,
         volume: f64, target: f64, sl: f64, tp: f64, expiry: i64,
+        #[serde(default, skip_serializing_if = "is_zero")]
+        magic: i64,
         #[serde(skip_serializing_if = "str::is_empty")]
         comment: &'a str,
     },
     OpenStop {
         ticket: &'a str, symbol: &'a str, side: Side,
         volume: f64, target: f64, sl: f64, tp: f64, expiry: i64,
+        #[serde(default, skip_serializing_if = "is_zero")]
+        magic: i64,
         #[serde(skip_serializing_if = "str::is_empty")]
         comment: &'a str,
     },
@@ -48,6 +56,7 @@ impl<'a> C2S<'a> {
                 volume: o.volume,
                 sl: o.sl.unwrap_or(0.0), tp: o.tp.unwrap_or(0.0),
                 slippage: o.max_slippage_pips,
+                magic: o.magic,
                 comment: &o.comment,
             },
             ConnectorCmd::OpenPending(p) => {
@@ -62,9 +71,9 @@ impl<'a> C2S<'a> {
                 // is the closest portable behaviour).
                 match p.order_type {
                     PendingType::Limit => C2S::OpenLimit {
-                        ticket, symbol, side, volume, target, sl, tp, expiry, comment },
+                        ticket, symbol, side, volume, target, sl, tp, expiry, magic: p.magic, comment },
                     PendingType::Stop | PendingType::StopLimit => C2S::OpenStop {
-                        ticket, symbol, side, volume, target, sl, tp, expiry, comment },
+                        ticket, symbol, side, volume, target, sl, tp, expiry, magic: p.magic, comment },
                 }
             }
             ConnectorCmd::Close { ticket } => C2S::Close { ticket },
