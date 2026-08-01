@@ -80,21 +80,6 @@ impl TicketMap {
         self.by_master.get(master).map(|v| v.clone()).unwrap_or_default()
     }
 
-    /// Directly wire an existing slave position to a master key (no pending
-    /// round-trip). Used when reconciling pre-existing positions after an
-    /// app/EA restart, where the slave reported no origin ticket but the
-    /// engine matched it to a master position by symbol/side/volume.
-    pub fn backfill(&self, slave_account: &str, slave_ticket: &str, master: MasterKey, rule_id: String) {
-        self.by_master
-            .entry(master)
-            .or_default()
-            .push(SlaveRef {
-                account_id: slave_account.to_string(),
-                ticket: slave_ticket.to_string(),
-                rule_id,
-            });
-    }
-
     /// Rewrite every occurrence of `(account_id, old_ticket)` to `new_ticket`
     /// — both when `account_id` appears as a master (rewrites the key of
     /// `by_master`) and as a slave (rewrites `SlaveRef::ticket` within any
