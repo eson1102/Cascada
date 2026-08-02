@@ -116,6 +116,11 @@ pub struct CopyRule {
     // unless its magic appears in this list; empty = filter off.
     #[serde(default)] pub master_magic_list: Vec<i64>,
 
+    // Don't mirror the master's pending (limit/stop) orders to the slave.
+    // The master's market fills (including pending-triggered positions) are
+    // still mirrored normally; only the pending-order placement is skipped.
+    #[serde(default)] pub ignore_pending: bool,
+
     // Order comment shaping — appended to the slave order's comment/label.
     // `order_comment` is a free-text template; when `order_comment_src_lot`
     // is set, `[SRC <lots>]` (the master's original volume) is appended.

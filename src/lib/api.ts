@@ -56,6 +56,8 @@ export interface CopyRule {
   /** Signal-side (master) magic-number filter (MT4/MT5 only). Trade is
    *  skipped unless its magic appears in this list; empty = filter off. */
   master_magic_list: number[];
+  /** 不跟随挂单：信号端的挂单（限价/止损单）不镜像到跟单端。 */
+  ignore_pending: boolean;
 
   /** Custom comment written onto slave orders. `order_comment_src_lot`
    *  appends a `[SRC <lots>]` marker with the master's original volume. */
@@ -160,6 +162,7 @@ export function defaultRule(master_id = "", slave_id = ""): CopyRule {
     min_lot: 0, max_lot: 0,
     master_min_lot: 0, master_max_lot: 0,
     master_magic_list: [],
+    ignore_pending: false,
     order_comment: "", order_comment_src_lot: false,
     symbol_whitelist: [], symbol_blacklist: [],
     symbol_prefix: "", symbol_suffix: "",

@@ -285,6 +285,7 @@
     const offN = r.quote_offsets?.length ?? 0;
     if (offN)                  out.push({ kind: "info", text: `偏差 · ${offN}` });
     if (r.comment_filter)      out.push({ kind: "info", text: `备注 “${r.comment_filter}”` });
+    if (r.ignore_pending)      out.push({ kind: "warn", text: "不跟随挂单" });
     if (r.skip_older_than_secs)out.push({ kind: "info", text: `跳过 >${r.skip_older_than_secs}s` });
     if (r.max_open_positions) out.push({ kind: "info", text: `≤ ${r.max_open_positions} 持仓` });
     if (r.max_exposure_lots)  out.push({ kind: "info", text: `≤ ${r.max_exposure_lots} 手` });
@@ -654,6 +655,14 @@
             <span class="check-text">
               <strong>信号端平仓时同步平仓</strong>
               <span class="muted">将信号端的平仓与挂单取消镜像到跟单端。关闭后由跟单端自行管理出场。</span>
+            </span>
+          </label>
+
+          <label class="check-row mt">
+            <input type="checkbox" bind:checked={editing.ignore_pending} />
+            <span class="check-text">
+              <strong>不跟随挂单</strong>
+              <span class="muted">信号端创建的挂单（限价/止损单）不镜像到跟单端。信号端挂单触发成交后的持仓仍会正常跟随。</span>
             </span>
           </label>
 

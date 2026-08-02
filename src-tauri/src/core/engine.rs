@@ -358,6 +358,12 @@ impl CopyEngine {
         let as_trade = pending_as_trade(p);
 
         for rule in rules {
+            // 规则设置"不跟随挂单"时跳过该规则的挂单镜像
+            if rule.ignore_pending {
+                self.state.emit_log(LogLevel::Info, &rule.slave_id,
+                    format!("skip pending {}（规则已开启不跟随挂单）", p.ticket));
+                continue;
+            }
             let caps = if rule.max_open_positions > 0
                 || rule.max_exposure_lots > 0.0
                 || rule.max_daily_loss > 0.0
